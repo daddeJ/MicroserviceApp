@@ -1,3 +1,4 @@
+using AuthService.DTOs;
 using AuthService.Services;
 using Microsoft.AspNetCore.Identity.Data;
 using Microsoft.AspNetCore.Mvc;
@@ -23,5 +24,17 @@ public class AuthController : ControllerBase
         if (result == null) 
             return Unauthorized(new { message = "Invalid credentials"});
         return Ok(result);
+    }
+    
+    [HttpPost("validate")]
+    public async Task<IActionResult> ValidateToken([FromBody] TokenValidationRequestDto dto)
+    {
+        if (dto.UserId == Guid.Empty || string.IsNullOrWhiteSpace(dto.Token))
+            return BadRequest("Invalid request");
+
+        // Call AuthService to validate token
+        await _authService.HandleAuthTokenEventAsync(dto.UserId, dto.Token);
+
+        return Ok(new { Message = "Token validation attempted. Activity logged if valid." });
     }
 }

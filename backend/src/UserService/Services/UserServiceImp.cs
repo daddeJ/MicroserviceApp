@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+using Newtonsoft.Json;
 using Shared.DTOs;
 using Shared.Events;
 using Shared.Helpers;
@@ -9,9 +11,6 @@ public class UserServiceImp : IUserService
 {
     private readonly RedisConnectionHelper _redisConnectionHelper;
     private readonly IEventPublisher _eventPublisher;
-    
-    private readonly Dictionary<Guid, UserRegistrationDto> _userRegistrations = new ();
-
     public UserServiceImp(RedisConnectionHelper redisConnectionHelper, IEventPublisher eventPublisher)
     {
         _redisConnectionHelper = redisConnectionHelper;
@@ -21,8 +20,12 @@ public class UserServiceImp : IUserService
     {
         var userId = Guid.NewGuid();
         dto.UserId = userId;
+
+        var redisLey = $"user:{userId}:temp";
+        var jsonData = JsonConvert.SerializeObject(dto);
         
-        _userRegistrations[userId] = dto;
+        var db = _redisConnectionHelper.GetDatabase();
+        await db.StringSetAsync(redisLey, jsonData, TimeSpan.FromHours(1));
 
         var activityEvent = new UserActivityEvent
         {
@@ -31,26 +34,8 @@ public class UserServiceImp : IUserService
             Timestamp = DateTime.UtcNow
         };
         
-        await _eventPublisher.PublishAsync("user.activity", activityEvent);
+        await _eventPublisher.PublishAsync("user.registered", activityEvent);
 
         return dto;
-    }
-
-    public async Task HandleAuthTokenEventAsync(Guid userId, string token)
-    {
-        var db = _redisConnectionHelper.GetDatabase();
-        var storedToken = await db.StringGetAsync($"user:{userId}:token");
-
-        if (storedToken.HasValue && storedToken == token)
-        {
-            var activityEvent = new UserActivityEvent
-            {
-                UserId = userId,
-                ActivityType = "auth_validated",
-                Timestamp = DateTime.UtcNow
-            };
-            
-            await _eventPublisher.PublishAsync("user.activity", activityEvent);
-        }
     }
 }

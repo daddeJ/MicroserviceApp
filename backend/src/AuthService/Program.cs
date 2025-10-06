@@ -22,6 +22,8 @@ builder.Services.AddSingleton<RabbitMqConnectionHelper>();
 builder.Services.AddSingleton<IEventPublisher, EventPublisher>();
 builder.Services.AddSingleton<IAuthService, AuthServiceImp>();
 
+builder.Services.AddSingleton<EventConsumer>();
+
 builder.Services.AddControllers();
 
 builder.Services.AddEndpointsApiExplorer();
@@ -39,6 +41,9 @@ app.UseRouting();
 app.UseAuthorization();
 
 app.MapControllers();
+
+var consumer = app.Services.GetRequiredService<EventConsumer>();
+consumer.StartConsuming();
 
 app.Run();
 
