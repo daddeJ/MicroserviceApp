@@ -1,0 +1,165 @@
+# ============================
+# .NET Build / Runtime Files
+# ============================
+bin/
+obj/
+out/
+Debug/
+Release/
+x64/
+x86/
+*.exe
+*.dll
+*.pdb
+*.cache
+*.log
+
+# ============================
+# Visual Studio & VS Code
+# ============================
+.vs/
+.vscode/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# ============================
+# Rider / JetBrains
+# ============================
+.idea/
+*.iml
+
+# ============================
+# User-Specific Files
+# ============================
+*.userprefs
+*.orig
+*.swp
+*.bak
+
+# ============================
+# NuGet
+# ============================
+*.nupkg
+*.snupkg
+# Ignore package folders
+packages/
+# If you want to keep packages.config versioned but not restore cache:
+**/packages/*/
+!**/packages/build/
+!**/packages/repositories.config
+
+# ============================
+# Logs & Dumps
+# ============================
+*.log
+*.tlog
+*.dmp
+*.stackdump
+*.err
+*.svclog
+
+# ============================
+# ASP.NET Core
+# ============================
+appsettings.*.json
+appsettings.Local.json
+appsettings.Development.json
+appsettings.Production.json
+.env
+.env.*
+
+# ============================
+# Entity Framework / Migrations
+# ============================
+Migrations/obj/
+Migrations/bin/
+
+# ============================
+# Docker
+# ============================
+# Docker build and temp files
+**/docker-compose*.yml.override
+**/docker-compose.override.yml
+**/Dockerfile.*
+**/Dockerfile-dev
+**/Dockerfile.local
+**/Dockerfile.old
+.docker/
+.dockerignore
+docker-compose.override.yml
+docker-compose.debug.yml
+docker-compose.prod.yml
+docker-compose.yml
+# Docker volumes
+**/data/
+**/db_data/
+**/redis_data/
+**/rabbitmq_data/
+
+# ============================
+# Secrets / Keys / Certificates
+# ============================
+*.pem
+*.key
+*.crt
+*.cer
+*.pfx
+*.p12
+*.der
+secrets.json
+
+# ============================
+# Temporary Files
+# ============================
+tmp/
+temp/
+*.tmp
+*.bak
+*.old
+*.backup
+*.lock
+*.DS_Store
+Thumbs.db
+
+# ============================
+# Testing / Coverage
+# ============================
+TestResults/
+coverage/
+*.coverage
+*.coveragexml
+*.trx
+
+# ============================
+# Build Artifacts / Tools
+# ============================
+publish/
+artifacts/
+dist/
+node_modules/
+bower_components/
+
+# ============================
+# OS Specific
+# ============================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+# Linux
+*~
+
+# ============================
+# Optional: CI/CD
+# ============================
+/*.env
+/Secrets/
+
+
