@@ -1,0 +1,90 @@
+@page "/register"
+@using BlazorWasm.Services
+@inject IUserApiClient UserApiClient
+@inject ITokenService TokenService
+@inject NavigationManager NavManager
+@inject AuthenticationStateProvider AuthStateProvider
+
+<h3>Register</h3>
+
+<div style="max-width: 400px; margin: 2rem auto; padding: 1rem; border: 1px solid #ccc; border-radius: 8px;">
+    <div style="margin-bottom: 1rem;">
+        <label for="fullname">Full Name</label><br />
+        <input id="fullname" @bind="_fullname" placeholder="Enter full name" style="width: 100%; padding: 0.5rem;" />
+    </div>
+
+    <div style="margin-bottom: 1rem;">
+        <label for="username">Username</label><br />
+        <input id="username" @bind="_username" placeholder="Enter username" style="width: 100%; padding: 0.5rem;" />
+    </div>
+
+    <div style="margin-bottom: 1rem;">
+        <label for="email">Email</label><br />
+        <input id="email" @bind="_email" placeholder="Enter email" style="width: 100%; padding: 0.5rem;" />
+    </div>
+
+    <div style="margin-bottom: 1rem;">
+        <label for="password">Password</label><br />
+        <input id="password" type="password" @bind="_password" placeholder="Enter password" style="width: 100%; padding: 0.5rem;" />
+    </div>
+
+    <div style="margin-bottom: 1rem;">
+        <label for="passwordConfirmation">Confirm Password</label><br />
+        <input id="passwordConfirmation" type="password" @bind="_passwordConfirmation" placeholder="Confirm password" style="width: 100%; padding: 0.5rem;" />
+    </div>
+
+    <div style="display: flex; gap: 1rem;">
+        <button @onclick="RegisterAsync" style="padding: 0.5rem 1rem;">Register</button>
+        <button @onclick="GoToLogin" style="padding: 0.5rem 1rem;">Back to Login</button>
+    </div>
+
+    @if (!string.IsNullOrEmpty(_errorMessage))
+    {
+        <p style="color: red; margin-top: 1rem;">@_errorMessage</p>
+    }
+</div>
+
+@code {
+    private string _fullname = string.Empty;
+    private string _username = string.Empty;
+    private string _email = string.Empty;
+    private string _password = string.Empty;
+    private string _passwordConfirmation = string.Empty;
+    private string _errorMessage = string.Empty;
+
+    private async Task RegisterAsync()
+    {
+        if (_password != _passwordConfirmation)
+        {
+            _errorMessage = "Passwords do not match.";
+            return;
+        }
+
+        var success = await UserApiClient.RegisterAsync(new()
+        {
+            FullName = _fullname,
+            Username = _username,
+            Email = _email,
+            Password = _password,
+            PasswordConfirmation = _passwordConfirmation
+        });
+
+        if (success != null)
+        {
+            await TokenService.SaveTokenAsync(success.Token);
+            
+            ((CustomAuthStateProvider)AuthStateProvider).NotifyAuthStateChanged();
+            
+            NavManager.NavigateTo("/");
+        }
+        else
+        {
+            _errorMessage = "Registration failed. Please try again.";
+        }
+    }
+
+    private void GoToLogin()
+    {
+        NavManager.NavigateTo("/login");
+    }
+}

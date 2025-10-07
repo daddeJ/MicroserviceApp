@@ -18,8 +18,7 @@ public class UserServiceImp : IUserService
     }
     public async Task<UserRegistrationDto> RegistrationUserAsync(UserRegistrationDto dto)
     {
-        var userId = Guid.NewGuid();
-        dto.UserId = userId;
+        var userId = dto.UserId == Guid.Empty ? Guid.NewGuid() : dto.UserId;
 
         var redisLey = $"user:{userId}:temp";
         var jsonData = JsonConvert.SerializeObject(dto);

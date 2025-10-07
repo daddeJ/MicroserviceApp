@@ -1,0 +1,62 @@
+@page "/login"
+@using BlazorWasm.Services
+
+@inject IAuthApiClient AuthApiClient
+@inject ITokenService TokenService
+@inject NavigationManager NavManager
+@inject AuthenticationStateProvider AuthStateProvider
+
+<h3>Login</h3>
+
+<div style="max-width: 400px; margin: 2rem auto; padding: 1rem; border: 1px solid #ccc; border-radius: 8px;">
+    <div style="margin-bottom: 1rem;">
+        <label for="username">Username</label><br />
+        <input id="username" @bind="_username" placeholder="Enter username" style="width: 100%; padding: 0.5rem;" />
+    </div>
+
+    <div style="margin-bottom: 1rem;">
+        <label for="password">Password</label><br />
+        <input id="password" type="password" @bind="_password" placeholder="Enter password" style="width: 100%; padding: 0.5rem;" />
+    </div>
+
+    <div style="display: flex; gap: 1rem;">
+        <button @onclick="LoginAsync" style="padding: 0.5rem 1rem;">Login</button>
+        <button @onclick="GoToRegister" style="padding: 0.5rem 1rem;">Register</button>
+    </div>
+
+    @if (!string.IsNullOrEmpty(_errorMessage))
+    {
+        <p style="color: red; margin-top: 1rem;">@_errorMessage</p>
+    }
+</div>
+
+@code {
+    private string _username = string.Empty;
+    private string _password = string.Empty;
+    private string _errorMessage = string.Empty;
+
+    private async Task LoginAsync()
+    {
+        var result = await AuthApiClient.LoginAsync(new()
+        {
+            Username = _username,
+            Password = _password
+        });
+
+        if (result != null)
+        {
+            await TokenService.SaveTokenAsync(result.Token);
+            ((CustomAuthStateProvider)AuthStateProvider).NotifyAuthStateChanged();
+            NavManager.NavigateTo("/");
+        }
+        else
+        {
+            _errorMessage = "Invalid username or password.";
+        }
+    }
+
+    private void GoToRegister()
+    {
+        NavManager.NavigateTo("/register");
+    }
+}
