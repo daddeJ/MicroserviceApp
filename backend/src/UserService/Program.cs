@@ -4,6 +4,17 @@ using UserService.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy =>
+    {
+        policy
+            .WithOrigins("http://localhost:5265") // your Blazor client
+            .AllowAnyHeader()
+            .AllowAnyMethod();
+    });
+});
+
 builder.Configuration.AddUserSecrets<Program>();
 
 builder.Services.AddSingleton<RedisConnectionHelper>();
@@ -25,6 +36,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseRouting();
+app.UseCors();
 app.UseAuthorization();
 app.MapControllers();
 
