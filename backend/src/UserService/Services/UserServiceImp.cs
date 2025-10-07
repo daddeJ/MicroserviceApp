@@ -30,11 +30,11 @@ public class UserServiceImp : IUserService
         var activityEvent = new UserActivityEvent
         {
             UserId = userId,
-            ActivityType = "register",
+            Action = "register",
             Timestamp = DateTime.UtcNow
         };
-        
         await _eventPublisher.PublishAsync("user.registered", activityEvent);
+        await _eventPublisher.PublishAsync("user.activity", activityEvent);
 
         return dto;
     }

@@ -59,6 +59,7 @@ packages/
 *.stackdump
 *.err
 *.svclog
+logs/
 
 # ============================
 # ASP.NET Core
