@@ -4,109 +4,137 @@ using Shared.DTOs;
 using Shared.Events;
 using Shared.Helpers;
 
-namespace AuthService.Services;
-
-public class AuthServiceImp : IAuthService
+namespace AuthService.Services
 {
-    private readonly JwtHelper _jwtHelper;
-    private readonly RedisConnectionHelper _redisConnectionHelper;
-    private readonly IEventPublisher _eventPublisher;
-
-    private readonly Dictionary<string, string> _users = new()
+    public class AuthServiceImp : IAuthService
     {
-        { "testuser", "Password123!" }
-    };
+        private readonly JwtHelper _jwtHelper;
+        private readonly RedisConnectionHelper _redisConnectionHelper;
+        private readonly IEventPublisher _eventPublisher;
 
-    public AuthServiceImp(JwtHelper jwtHelper, RedisConnectionHelper redisConnectionHelper, IEventPublisher eventPublisher)
-    {
-        _jwtHelper = jwtHelper;
-        _redisConnectionHelper = redisConnectionHelper;
-        _eventPublisher = eventPublisher;
-    }
-    
-    public async Task<AuthResponseDto?> LoginAsync(AuthRequestDto dto)
-    {
-        if (!_users.TryGetValue(dto.Username, out var password) || password != dto.Password)
-            return null;
-
-        var userId = Guid.NewGuid();
-        var token = _jwtHelper.GenerateToken(userId, dto.Username);
-
-        var db = _redisConnectionHelper.GetDatabase();
-        await db.StringSetAsync($"user:{userId}:token", token, TimeSpan.FromHours(1));
-
-        var authEvent = new AuthTokenGeneratedEvent
+        private readonly Dictionary<string, string> _users = new()
         {
-            UserId = userId,
-            Token = token,
-            GeneratedAt = DateTime.UtcNow.AddHours(1)
+            { "testuser", "Password123!" }
         };
 
-        var activityEvent = new UserActivityEvent
+        public AuthServiceImp(
+            JwtHelper jwtHelper,
+            RedisConnectionHelper redisConnectionHelper,
+            IEventPublisher eventPublisher)
         {
-            UserId = userId,
-            ActivityType = "login",
-            Timestamp = DateTime.UtcNow,
-        };
+            _jwtHelper = jwtHelper;
+            _redisConnectionHelper = redisConnectionHelper;
+            _eventPublisher = eventPublisher;
+        }
         
-        await _eventPublisher.PublishAsync("auth.token.generated", authEvent);
-        await _eventPublisher.PublishAsync("auth.activity", activityEvent);
-
-        return new AuthResponseDto
+        public async Task<AuthResponseDto?> LoginAsync(AuthRequestDto dto)
         {
-            Token = token,
-            Expires = DateTime.UtcNow.AddHours(1),
-            RefreshToken = null
-        };
-    }
-    
-    public async Task HandleAuthTokenEventAsync(Guid userId, string token)
-    {
-        var db = _redisConnectionHelper.GetDatabase();
-        var storedToken = await db.StringGetAsync($"user:{userId}:token");
+            if (!_users.TryGetValue(dto.Username, out var password) || password != dto.Password)
+                return null;
 
-        if (storedToken.HasValue && storedToken == token)
-        {
-            var activityEvent = new UserActivityEvent
+            var userId = Guid.NewGuid();
+            var token = _jwtHelper.GenerateToken(userId, dto.Username);
+
+            var db = _redisConnectionHelper.GetDatabase();
+            await db.StringSetAsync($"user:{userId}:token", token, TimeSpan.FromHours(1));
+
+            var tokenEvent = new AuthTokenGeneratedEvent
             {
                 UserId = userId,
-                ActivityType = "auth_validated",
+                Token = token,
+                GeneratedAt = DateTime.UtcNow
+            };
+            await _eventPublisher.PublishAsync("auth.token.generated", tokenEvent);
+
+            var authActivity = new AuthActivityEvent
+            {
+                UserId = userId,
+                Action = "login_success",
                 Timestamp = DateTime.UtcNow
             };
-            
-            await _eventPublisher.PublishAsync("user.activity", activityEvent);
+            await _eventPublisher.PublishAsync("auth.activity", authActivity);
+
+            var userActivity = new UserActivityEvent
+            {
+                UserId = userId,
+                Action = "login",
+                Timestamp = DateTime.UtcNow
+            };
+            await _eventPublisher.PublishAsync("user.activity", userActivity);
+
+            return new AuthResponseDto
+            {
+                Token = token,
+                Expires = DateTime.UtcNow.AddHours(1),
+                RefreshToken = null
+            };
         }
-    }
-    
-    public async Task HandleUserRegisteredAsync(Guid userId)
-    {
-        var db = _redisConnectionHelper.GetDatabase();
-        var redisKey = $"user:{userId}:temp";
 
-        var userDataJson = await db.StringGetAsync(redisKey);
-        if (!userDataJson.HasValue) return;
-
-        var userDto = JsonConvert.DeserializeObject<UserRegistrationDto>(userDataJson);
-        if (userDto == null) return;
-
-        var token = _jwtHelper.GenerateToken(userId, userDto.Username);
-
-        await db.StringSetAsync($"user:{userId}:token", token, TimeSpan.FromHours(1));
-
-        var authEvent = new AuthTokenGeneratedEvent
+        public async Task HandleAuthTokenEventAsync(Guid userId, string token)
         {
-            UserId = userId,
-            Token = token,
-            GeneratedAt = DateTime.UtcNow.AddHours(1)
-        };
-        await _eventPublisher.PublishAsync("auth.token.generated", authEvent);
+            var db = _redisConnectionHelper.GetDatabase();
+            var storedToken = await db.StringGetAsync($"user:{userId}:token");
 
-        var activityEvent = new UserActivityEvent
+            if (storedToken.HasValue && storedToken == token)
+            {
+                var authActivity = new AuthActivityEvent
+                {
+                    UserId = userId,
+                    Action = "user_validated",
+                    Timestamp = DateTime.UtcNow
+                };
+                await _eventPublisher.PublishAsync("auth.activity", authActivity);
+            }
+            else
+            {
+                var authActivity = new AuthActivityEvent
+                {
+                    UserId = userId,
+                    Action = "token_validation_failed",
+                    Timestamp = DateTime.UtcNow
+                };
+                await _eventPublisher.PublishAsync("auth.activity", authActivity);
+            }
+        }
+        
+        public async Task HandleUserRegisteredAsync(Guid userId)
         {
-            UserId = userId,
-            ActivityType = "register_authenticated",
-            Timestamp = DateTime.UtcNow
-        };
-        await _eventPublisher.PublishAsync("user.activity", activityEvent);
+            var db = _redisConnectionHelper.GetDatabase();
+            var redisKey = $"user:{userId}:temp";
+
+            var userDataJson = await db.StringGetAsync(redisKey);
+            if (!userDataJson.HasValue) return;
+
+            var userDto = JsonConvert.DeserializeObject<UserRegistrationDto>(userDataJson);
+            if (userDto == null) return;
+
+            var token = _jwtHelper.GenerateToken(userId, userDto.Username);
+
+            await db.StringSetAsync($"user:{userId}:token", token, TimeSpan.FromHours(1));
+
+            var tokenEvent = new AuthTokenGeneratedEvent
+            {
+                UserId = userId,
+                Token = token,
+                GeneratedAt = DateTime.UtcNow
+            };
+            await _eventPublisher.PublishAsync("auth.token.generated", tokenEvent);
+
+            var authActivity = new AuthActivityEvent
+            {
+                UserId = userId,
+                Action = "token_generated_for_registered_user",
+                Timestamp = DateTime.UtcNow
+            };
+            await _eventPublisher.PublishAsync("auth.activity", authActivity);
+
+            var userActivity = new UserActivityEvent
+            {
+                UserId = userId,
+                Action = "register_authenticated",
+                Timestamp = DateTime.UtcNow
+            };
+            await _eventPublisher.PublishAsync("user.activity", userActivity);
+        }
     }
 }
