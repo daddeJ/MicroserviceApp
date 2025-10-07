@@ -27,22 +27,17 @@ public class UserController : ControllerBase
     {
         var user = await _userService.RegistrationUserAsync(userRegistration);
         
-        if (_env.IsDevelopment())
+        await Task.Delay(500); 
+
+        var db = _redisHelper.GetDatabase();
+        var tokenKey = $"user:{user.UserId}:token";
+        var tokenValue = await db.StringGetAsync(tokenKey);
+
+        return Ok(new
         {
-            await Task.Delay(500); 
-
-            var db = _redisHelper.GetDatabase();
-            var tokenKey = $"user:{user.UserId}:token";
-            var tokenValue = await db.StringGetAsync(tokenKey);
-
-            return Ok(new
-            {
-                UserId = user.UserId,
-                Username = user.Username,
-                Token = tokenValue.ToString()
-            });
-        }
-        
-        return Ok(user);
+            UserId = user.UserId,
+            Username = user.Username,
+            Token = tokenValue.ToString()
+        });
     }
 }

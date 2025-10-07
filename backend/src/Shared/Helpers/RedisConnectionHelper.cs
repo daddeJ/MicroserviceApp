@@ -1,41 +1,51 @@
 using StackExchange.Redis;
+using System;
 
-namespace Shared.Helpers;
-
-public class RedisConnectionHelper
+namespace Shared.Helpers
 {
-    private static ConnectionMultiplexer? _redis;
-    private static readonly object _lock = new();
-
-    public ConnectionMultiplexer GetConnection(string connectionString = "localhost:6379")
+    public class RedisConnectionHelper
     {
-        if (_redis == null || !_redis.IsConnected)
+        private static ConnectionMultiplexer? _redis;
+        private static readonly object _lock = new();
+
+        public ConnectionMultiplexer GetConnection(string? connectionString = null)
         {
-            lock (_lock)
+            connectionString ??= Environment.GetEnvironmentVariable("REDIS_CONNECTION") ?? "redis:6379";
+
+            if (_redis == null || !_redis.IsConnected)
             {
-                if (_redis == null || !_redis.IsConnected)
+                lock (_lock)
                 {
-                    _redis = ConnectionMultiplexer.Connect(connectionString);
-                    Console.WriteLine($"Connected to redis: {connectionString}");
+                    if (_redis == null || !_redis.IsConnected)
+                    {
+                        var options = ConfigurationOptions.Parse(connectionString);
+                        options.AbortOnConnectFail = false; // Retry until Redis is available
+                        options.ConnectRetry = 5;           // Number of retries
+                        options.ConnectTimeout = 5000;      // Timeout per try
+                        
+                        _redis = ConnectionMultiplexer.Connect(options);
+                        Console.WriteLine($"Connected to Redis: {connectionString}");
+                    }
                 }
             }
+
+            return _redis;
         }
-        return _redis;
-    }
 
-    public IDatabase GetDatabase(int db = 0)
-    {
-        var connection = GetConnection();
-        return connection.GetDatabase(db);
-    }
-
-    public void CloseConnection()
-    {
-        if (_redis != null && _redis.IsConnected)
+        public IDatabase GetDatabase(int db = 0)
         {
-            _redis.Close();
-            _redis.Dispose();
-            Console.WriteLine("Redis connection closed");
+            var connection = GetConnection();
+            return connection.GetDatabase(db);
+        }
+
+        public void CloseConnection()
+        {
+            if (_redis != null && _redis.IsConnected)
+            {
+                _redis.Close();
+                _redis.Dispose();
+                Console.WriteLine("Redis connection closed");
+            }
         }
     }
 }
