@@ -37,6 +37,7 @@ x86/
 *.orig
 *.swp
 *.bak
+Migrations/
 
 # ============================
 # NuGet

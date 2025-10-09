@@ -10,7 +10,7 @@ namespace Shared.Helpers
 
         public ConnectionMultiplexer GetConnection(string? connectionString = null)
         {
-            connectionString ??= Environment.GetEnvironmentVariable("REDIS_CONNECTION") ?? "redis:6379";
+            connectionString ??= Environment.GetEnvironmentVariable("REDIS_CONNECTION") ?? "localhost:6379";
 
             if (_redis == null || !_redis.IsConnected)
             {

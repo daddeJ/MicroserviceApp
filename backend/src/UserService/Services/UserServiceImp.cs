@@ -1,30 +1,30 @@
-using System.Text.Json.Serialization;
-using Newtonsoft.Json;
+using Shared.Caching;
+using Shared.Constants;
 using Shared.DTOs;
 using Shared.Events;
-using Shared.Helpers;
+using Shared.Interfaces;
 using UserService.Messaging;
 
 namespace UserService.Services;
 
 public class UserServiceImp : IUserService
 {
-    private readonly RedisConnectionHelper _redisConnectionHelper;
-    private readonly IEventPublisher _eventPublisher;
-    public UserServiceImp(RedisConnectionHelper redisConnectionHelper, IEventPublisher eventPublisher)
+    private readonly RedisCacheHelper _cacheHelper;
+    private readonly IMessagePublisher _messagePublisher;
+
+    public UserServiceImp(RedisCacheHelper cacheHelper, IMessagePublisher messagePublisher)
     {
-        _redisConnectionHelper = redisConnectionHelper;
-        _eventPublisher = eventPublisher;
+        _cacheHelper = cacheHelper;
+        _messagePublisher = messagePublisher;
     }
-    public async Task<UserRegistrationDto> RegistrationUserAsync(UserRegistrationDto dto)
+
+    public async Task<UserDto> RegistrationUserAsync(UserDto dto)
     {
         var userId = dto.UserId == Guid.Empty ? Guid.NewGuid() : dto.UserId;
 
-        var redisLey = $"user:{userId}:temp";
-        var jsonData = JsonConvert.SerializeObject(dto);
-        
-        var db = _redisConnectionHelper.GetDatabase();
-        await db.StringSetAsync(redisLey, jsonData, TimeSpan.FromHours(1));
+        var redisKey = $"user:{userId}:temp";
+
+        await _cacheHelper.SetAsync(redisKey, dto, TimeSpan.FromHours(1));
 
         var activityEvent = new UserActivityEvent
         {
@@ -32,8 +32,9 @@ public class UserServiceImp : IUserService
             Action = "register",
             Timestamp = DateTime.UtcNow
         };
-        await _eventPublisher.PublishAsync("user.registered", activityEvent);
-        await _eventPublisher.PublishAsync("user.activity", activityEvent);
+
+        await _messagePublisher.PublishAsync(QueueNames.UserRegisterActivity, activityEvent);
+        await _messagePublisher.PublishAsync(QueueNames.UserActivity, activityEvent);
 
         return dto;
     }

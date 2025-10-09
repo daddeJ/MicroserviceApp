@@ -3,6 +3,7 @@ using System.Text.Json;
 using AuthService.Services;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
+using Shared.Constants;
 using Shared.Events;
 using Shared.Helpers;
 
@@ -24,8 +25,8 @@ public class EventConsumer
         var channel = await _rabbitHelper.GetChannelAsync();
 
         await channel.QueueDeclareAsync(
-            queue: "user.registered",
-            durable: false,
+            queue: QueueNames.UserRegisterActivity,
+            durable: true,
             exclusive: false,
             autoDelete: false,
             arguments: null
@@ -55,7 +56,7 @@ public class EventConsumer
         };
 
         await channel.BasicConsumeAsync(
-            queue: "user.registered",
+            queue: QueueNames.UserRegisterActivity,
             autoAck: false,
             consumer: consumer
         );
