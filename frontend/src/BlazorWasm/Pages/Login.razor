@@ -30,10 +30,22 @@
     }
 </div>
 
+
 @code {
     private string _username = string.Empty;
     private string _password = string.Empty;
     private string _errorMessage = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity is not null && user.Identity.IsAuthenticated)
+        {
+            NavManager.NavigateTo("/");
+        }
+    }
 
     private async Task LoginAsync()
     {
@@ -46,7 +58,12 @@
         if (result != null)
         {
             await TokenService.SaveTokenAsync(result.Token);
-            ((CustomAuthStateProvider)AuthStateProvider).NotifyAuthStateChanged();
+
+            if (AuthStateProvider is CustomAuthStateProvider customProvider)
+            {
+                customProvider.NotifyAuthStateChanged();
+            }
+
             NavManager.NavigateTo("/");
         }
         else
