@@ -21,7 +21,7 @@ namespace Shared.Helpers
             int maxRetries = 10,
             int delayMilliseconds = 5000)
         {
-            hostName ??= GetEnv("RABBITMQ_HOST", "rabbitmq");
+            hostName ??= GetEnv("RABBITMQ_HOST", "localhost");
             userName ??= GetEnv("RABBITMQ_USER", "guest");
             password ??= GetEnv("RABBITMQ_PASS", "guest");
 

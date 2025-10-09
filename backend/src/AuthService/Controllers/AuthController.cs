@@ -16,15 +16,6 @@ public class AuthController : ControllerBase
     {
         _authService = authService;
     }
-
-    [HttpPost("login")]
-    public async Task<IActionResult> Login([FromBody] AuthRequestDto request)
-    {
-        var result = await _authService.LoginAsync(request);
-        if (result == null) 
-            return Unauthorized(new { message = "Invalid credentials"});
-        return Ok(result);
-    }
     
     [HttpPost("validate")]
     public async Task<IActionResult> ValidateToken([FromBody] TokenValidationRequestDto dto)

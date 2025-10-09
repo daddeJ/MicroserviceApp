@@ -1,4 +1,9 @@
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+using Shared.Extensions;
 using Shared.Helpers;
+using UserService.Data;
+using UserService.Helpers;
 using UserService.Messaging;
 using UserService.Services;
 
@@ -17,17 +22,26 @@ builder.Services.AddCors(options =>
 
 builder.Configuration.AddUserSecrets<Program>();
 
-builder.Services.AddSingleton<RedisConnectionHelper>();
-builder.Services.AddSingleton<RabbitMqConnectionHelper>();
+builder.Services.AddRedisCache(builder.Configuration);
+builder.Services.AddRabbitMq(builder.Configuration);
 
 builder.Services.AddSingleton<IEventPublisher, EventPublisher>();
 builder.Services.AddSingleton<IUserService, UserServiceImp>();
+
+builder.Services.AddDbContext<UserDbContext>(options =>
+    options.UseSqlServer(builder.Configuration.GetConnectionString("UserServiceConnection")));
+
+builder.Services.AddIdentity<ApplicationUser, IdentityRole>()
+    .AddEntityFrameworkStores<UserDbContext>()
+    .AddDefaultTokenProviders();
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
+
+await DataSeeder.SeedRoles(app.Services);
 
 if (app.Environment.IsDevelopment())
 {

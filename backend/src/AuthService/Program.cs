@@ -1,5 +1,6 @@
 using AuthService.Messaging;
 using AuthService.Services;
+using Shared.Extensions;
 using Shared.Helpers;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -17,18 +18,7 @@ builder.Services.AddCors(options =>
 
 builder.Configuration.AddUserSecrets<Program>();
 
-builder.Services.AddSingleton<JwtHelper>(sp =>
-{
-    var config = sp.GetRequiredService<IConfiguration>();
-    var publicKey = config["JwtSettings:PublicKey"]
-        ?? throw new InvalidOperationException("Public key not found in JWT");
-    var privateKey = config["JwtSettings:PrivateKey"]
-        ?? throw new InvalidOperationException("Private key not found in JWT");
-    
-    return new JwtHelper(privateKey,  publicKey);
-});
-builder.Services.AddSingleton<RedisConnectionHelper>();
-builder.Services.AddSingleton<RabbitMqConnectionHelper>();
+builder.Services.AddSharedInfrastructure(builder.Configuration);
 
 builder.Services.AddSingleton<IEventPublisher, EventPublisher>();
 builder.Services.AddSingleton<IAuthService, AuthServiceImp>();
