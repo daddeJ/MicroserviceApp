@@ -11,12 +11,6 @@ namespace AuthService.Services
         private readonly JwtHelper _jwtHelper;
         private readonly RedisConnectionHelper _redisConnectionHelper;
         private readonly IEventPublisher _eventPublisher;
-
-        private readonly Dictionary<string, string> _users = new()
-        {
-            { "testuser", "Password123!" }
-        };
-
         public AuthServiceImp(
             JwtHelper jwtHelper,
             RedisConnectionHelper redisConnectionHelper,
@@ -29,14 +23,33 @@ namespace AuthService.Services
         
         public async Task<AuthResponseDto?> LoginAsync(AuthRequestDto dto)
         {
-            if (!_users.TryGetValue(dto.Username, out var password) || password != dto.Password)
-                return null;
-
-            var userId = Guid.NewGuid();
-            var token = _jwtHelper.GenerateToken(userId, dto.Username);
-
             var db = _redisConnectionHelper.GetDatabase();
-            await db.StringSetAsync($"user:{userId}:token", token, TimeSpan.FromHours(1));
+
+            var userIdValue = await db.StringGetAsync($"user:username:{dto.Username}");
+            Guid userId;
+
+            if (userIdValue.HasValue)
+            {
+                userId = Guid.Parse(userIdValue);
+            }
+            else
+            {
+                userId = Guid.NewGuid();
+                await db.StringSetAsync($"user:username:{dto.Username}", userId.ToString());
+            }
+
+            var existingToken = await db.StringGetAsync($"user:{userId}:temp");
+
+            string token;
+            if (existingToken.HasValue)
+            {
+                token = existingToken.ToString();
+            }
+            else
+            {
+                token = _jwtHelper.GenerateToken(userId, dto.Username);
+                await db.StringSetAsync($"user:{userId}:temp", token, TimeSpan.FromHours(1));
+            }
 
             var tokenEvent = new AuthTokenGeneratedEvent
             {

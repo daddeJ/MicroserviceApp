@@ -34,8 +34,8 @@
     </div>
 
     <div style="display: flex; gap: 1rem;">
+        <button @onclick="GoToLogin" style="padding: 0.5rem 1rem;">Back</button>
         <button @onclick="RegisterAsync" style="padding: 0.5rem 1rem;">Register</button>
-        <button @onclick="GoToLogin" style="padding: 0.5rem 1rem;">Back to Login</button>
     </div>
 
     @if (!string.IsNullOrEmpty(_errorMessage))

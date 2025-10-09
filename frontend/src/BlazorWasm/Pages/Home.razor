@@ -1,9 +1,27 @@
 ﻿@page "/"
-
 @attribute [Authorize]
+
+@using BlazorWasm.Services
+@inject ITokenService TokenService
+@inject NavigationManager NavigationManager
 
 <PageTitle>Home</PageTitle>
 
 <h1>Hello, world!</h1>
+<p>Welcome to your new app.</p>
 
-Welcome to your new app.
+<button class="btn btn-success" @onclick="RegisterUser">Register</button>
+<button class="btn btn-danger" @onclick="Logout">Logout</button>
+
+@code {
+    private async Task Logout()
+    {
+        await TokenService.RemoveTokenAsync();
+
+        NavigationManager.NavigateTo("/login", forceLoad: true);
+    }
+    private async Task RegisterUser()
+    {
+        NavigationManager.NavigateTo("/register", forceLoad: true);
+    }
+}
