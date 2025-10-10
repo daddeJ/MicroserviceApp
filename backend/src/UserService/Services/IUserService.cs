@@ -4,5 +4,5 @@ namespace UserService.Services;
 
 public interface IUserService
 {
-    Task<UserDto> RegistrationUserAsync(UserDto dto);
+    Task<UserDto> AuthenticateUserAsync(UserDto dto, string activity);
 }

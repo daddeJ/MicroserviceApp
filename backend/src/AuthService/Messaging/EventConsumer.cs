@@ -25,7 +25,7 @@ public class EventConsumer
         var channel = await _rabbitHelper.GetChannelAsync();
 
         await channel.QueueDeclareAsync(
-            queue: QueueNames.UserRegisterActivity,
+            queue: QueueNames.GenerateTokenActivity,
             durable: true,
             exclusive: false,
             autoDelete: false,
@@ -44,7 +44,7 @@ public class EventConsumer
                 var userEvent = JsonSerializer.Deserialize<UserActivityEvent>(message);
                 if (userEvent != null)
                 {
-                    await _authService.HandleUserRegisteredAsync(userEvent.UserId);
+                    await _authService.HandleUserAuthenticationTokenAsync(userEvent.UserId);
                 }
 
                 channel.BasicAckAsync(ea.DeliveryTag, false);
@@ -56,7 +56,7 @@ public class EventConsumer
         };
 
         await channel.BasicConsumeAsync(
-            queue: QueueNames.UserRegisterActivity,
+            queue: QueueNames.GenerateTokenActivity,
             autoAck: false,
             consumer: consumer
         );

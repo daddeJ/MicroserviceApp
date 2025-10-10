@@ -1,5 +1,7 @@
+using AuthService.Data;
 using AuthService.Messaging;
 using AuthService.Services;
+using Microsoft.EntityFrameworkCore;
 using Shared.Extensions;
 using Shared.Helpers;
 
@@ -24,6 +26,9 @@ builder.Services.AddSingleton<IEventPublisher, EventPublisher>();
 builder.Services.AddSingleton<IAuthService, AuthServiceImp>();
 
 builder.Services.AddSingleton<EventConsumer>();
+
+builder.Services.AddDbContext<AuthDbContext>(options =>
+    options.UseSqlServer(builder.Configuration.GetConnectionString("AuthServiceConnection")));
 
 builder.Services.AddControllers();
 

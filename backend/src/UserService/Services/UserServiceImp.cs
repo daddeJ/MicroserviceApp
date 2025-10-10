@@ -1,3 +1,4 @@
+using Microsoft.JSInterop.Infrastructure;
 using Shared.Caching;
 using Shared.Constants;
 using Shared.DTOs;
@@ -18,24 +19,32 @@ public class UserServiceImp : IUserService
         _messagePublisher = messagePublisher;
     }
 
-    public async Task<UserDto> RegistrationUserAsync(UserDto dto)
+    public async Task<UserDto> AuthenticateUserAsync(UserDto dto, string activity)
     {
         var userId = dto.UserId == Guid.Empty ? Guid.NewGuid() : dto.UserId;
-
         var redisKey = $"user:{userId}:temp";
-
         await _cacheHelper.SetAsync(redisKey, dto, TimeSpan.FromHours(1));
-
-        var activityEvent = new UserActivityEvent
-        {
-            UserId = userId,
-            Action = "register",
-            Timestamp = DateTime.UtcNow
-        };
-
-        await _messagePublisher.PublishAsync(QueueNames.UserRegisterActivity, activityEvent);
-        await _messagePublisher.PublishAsync(QueueNames.UserActivity, activityEvent);
-
+        await PublishTokenAndActivityEvents(userId, activity);
         return dto;
     }
+    
+    private async Task PublishTokenAndActivityEvents(Guid userId, string userAction)
+    {
+        var authActivity = new AuthActivityEvent()
+        {
+            UserId = userId,
+            Action = "generate_token",
+            Timestamp = DateTime.UtcNow
+        };
+        await _messagePublisher.PublishAsync(QueueNames.GenerateTokenActivity, authActivity);
+
+        var userActivity = new UserActivityEvent
+        {
+            UserId = userId,
+            Action = userAction,
+            Timestamp = DateTime.UtcNow
+        };
+        await _messagePublisher.PublishAsync(QueueNames.UserActivity, userActivity);
+    }
+
 }

@@ -3,6 +3,7 @@ using System.Text.Json;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using Serilog;
+using Shared.Constants;
 using Shared.Events;
 using Shared.Helpers;
 
@@ -22,7 +23,7 @@ public class UserActivityConsumer
         var channel = await _rabbitHelper.GetChannelAsync();
 
         await channel.QueueDeclareAsync(
-            queue: "user.activity",
+            queue: QueueNames.UserActivity,
             durable: true,
             exclusive: false,
             autoDelete: false,
@@ -47,7 +48,7 @@ public class UserActivityConsumer
         };
         
         await channel.BasicConsumeAsync(
-            queue: "user.activity",
+            queue: QueueNames.UserActivity,
             autoAck: false,
             consumer: consumer
         );

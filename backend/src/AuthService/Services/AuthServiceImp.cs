@@ -46,7 +46,7 @@ namespace AuthService.Services
             await _messagePublisher.PublishAsync(QueueNames.AuthActivity, authActivity);
         }
         
-        public async Task HandleUserRegisteredAsync(Guid userId)
+        public async Task HandleUserAuthenticationTokenAsync(Guid userId)
         {
             var redisKey = $"user:{userId}:temp";
             var userDto = await _redisCache.GetAsync<UserDto>(redisKey);
@@ -74,7 +74,7 @@ namespace AuthService.Services
                 userId,
                 token,
                 "token_generated_for_registered_user",
-                "register_authenticated"
+                "user_authenticated"
             );
         }
 
