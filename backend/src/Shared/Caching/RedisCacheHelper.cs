@@ -35,6 +35,29 @@ public class RedisCacheHelper
         var data = await _db.StringGetAsync(key);
         return data.HasValue ? data.ToString() : null;
     }
+    
+    public async Task<string?> WaitForValueAsync(
+        string key,
+        int maxAttempts = 5,
+        int delayMs = 500)
+    {
+        string? value = null;
 
+        for (int attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            value = await GetStringAsync(key);
+            if (!string.IsNullOrEmpty(value))
+                return value;
+
+            // _logger.LogInformation(
+            //     "[Redis Polling] Attempt {Attempt}/{MaxAttempts} — Key: {Key} not found yet",
+            //     attempt, maxAttempts, key);
+
+            await Task.Delay(delayMs);
+        }
+        //
+        // _logger.LogWarning("[Redis Polling] Value not found for key {Key} after {MaxAttempts} attempts", key, maxAttempts);
+        return null;
+    }
     public async Task RemoveAsync(string key) => await _db.KeyDeleteAsync(key);
 }
