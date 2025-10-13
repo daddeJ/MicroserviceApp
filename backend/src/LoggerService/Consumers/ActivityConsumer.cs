@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using LoggerService.Factories;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using Serilog;
@@ -9,13 +10,14 @@ using Shared.Helpers;
 
 namespace LoggerService.Consumers;
 
-public class UserActivityConsumer
+public class ActivityConsumer : IActivityConsumer
 {
     private readonly RabbitMqConnectionHelper _rabbitHelper;
-
-    public UserActivityConsumer(RabbitMqConnectionHelper rabbitHelper)
+    private readonly ILoggerActionFactory _loggerActionFactory;
+    public ActivityConsumer(RabbitMqConnectionHelper rabbitHelper, ILoggerActionFactory loggerActionFactory)
     {
         _rabbitHelper = rabbitHelper;
+        _loggerActionFactory = loggerActionFactory;
     }
 
     public async Task StartConsumingAsync()
@@ -23,7 +25,7 @@ public class UserActivityConsumer
         var channel = await _rabbitHelper.GetChannelAsync();
 
         await channel.QueueDeclareAsync(
-            queue: QueueNames.UserActivity,
+            queue: QueueNames.LoggerActivity,
             durable: true,
             exclusive: false,
             autoDelete: false,
@@ -40,18 +42,17 @@ public class UserActivityConsumer
 
             if (activity != null)
             {
-                Log.Information("[User Activity] UserId: {UserId}, Type: {ActivityType}, Time: {Timestamp}",
-                    activity.UserId, activity.Action, activity.Timestamp);
+                _loggerActionFactory.LogActivity(activity);
             }
             
             await Task.CompletedTask;
         };
         
         await channel.BasicConsumeAsync(
-            queue: QueueNames.UserActivity,
+            queue: QueueNames.AuthActivity,
             autoAck: false,
             consumer: consumer
         );
-        Log.Information("Listening to 'user.activity' queue...");
+        Log.Information("Listening to 'auth.activity' queue...");
     }
 }

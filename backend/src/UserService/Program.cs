@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Shared.Extensions;
 using Shared.Helpers;
 using UserService.Data;
+using UserService.Data.Transactions;
 using UserService.Helpers;
 using UserService.Messaging;
 using UserService.Services;
@@ -26,7 +27,10 @@ builder.Services.AddRedisCache(builder.Configuration);
 builder.Services.AddRabbitMq(builder.Configuration);
 
 builder.Services.AddSingleton<IEventPublisher, EventPublisher>();
-builder.Services.AddSingleton<IUserService, UserServiceImp>();
+
+builder.Services.AddScoped<IUserRegistrationTransaction, UserRegistrationTransaction>();
+builder.Services.AddScoped<IUserService, UserServiceImp>();
+builder.Services.AddScoped<IPublisherService, PublishedService>();
 
 builder.Services.AddDbContext<UserDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("UserServiceConnection")));

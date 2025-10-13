@@ -1,15 +1,64 @@
-using LoggerService.Startup;
+using LoggerService.Consumers;
+using LoggerService.Data;
+using LoggerService.Factories;
+using LoggerService.Services;
+using Microsoft.EntityFrameworkCore;
 using Serilog;
+using Serilog.Events;
+using Serilog.Sinks.MSSqlServer;
+using Shared.Extensions;
 
-var builder = WebApplication.CreateBuilder(args);
+try
+{
+    var builder = WebApplication.CreateBuilder(args);
+    
+    builder.Services.AddSharedFactories(builder.Configuration);
+    
+    builder.Services.AddSingleton<ILoggerActionFactory, LoggerActionFactory>();
+    builder.Services.AddSingleton<IActivityConsumer, ActivityConsumer>();
+    builder.Services.AddHostedService<UserActivityConsumerService>();
 
-Log.Logger = new LoggerConfiguration()
-    .WriteTo.Console()
-    .WriteTo.File("logs/logger.text", rollingInterval: RollingInterval.Day)
-    .CreateLogger();
+    builder.Host.UseSerilog((context, services, configuration) =>
+    {
+        configuration
+            .ReadFrom.Configuration(context.Configuration)
+            .Enrich.FromLogContext()
+            .Enrich.WithCorrelationId()
+            .Enrich.WithClientIp()
+            .WriteTo.Console()
+            .WriteTo.File(
+                path: "logs/log-.txt",
+                rollingInterval: RollingInterval.Day,
+                retainedFileCountLimit: 7,
+                restrictedToMinimumLevel: LogEventLevel.Information)
+            .WriteTo.Async(a => a.MSSqlServer(
+                connectionString: context.Configuration.GetConnectionString("LoggerServiceConnection"),
+                sinkOptions: new MSSqlServerSinkOptions
+                {
+                    TableName = "ApplicationLogs",
+                    AutoCreateSqlTable = true
+                },
+                restrictedToMinimumLevel: LogEventLevel.Information
+            ));
+    });
 
-builder.Host.UseSerilog();
+    Log.Information("=== Starting Logger Service ===");
 
-var app = builder.Build();
-await LoggerStartupHelper.InitializeAndStartConsumersAsync();
-app.Run();
+    builder.Services.AddDbContext<LoggerDbContext>(options =>
+        options.UseSqlServer(builder.Configuration.GetConnectionString("LoggerServiceConnection")));
+
+    var app = builder.Build();
+
+    app.UseSerilogRequestLogging();
+
+    Log.Information("LoggerService is running...");
+    app.Run();
+}
+catch (Exception ex)
+{
+    Log.Fatal(ex, "LoggerService failed to start");
+}
+finally
+{
+    Log.CloseAndFlush();
+}
