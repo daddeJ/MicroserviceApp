@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Shared.Caching;
+using Shared.Factories;
 using Shared.Helpers;
 using Shared.Interfaces;
 using Shared.Messaging;
@@ -14,8 +15,8 @@ public static class ServiceCollectionExtensions
         IConfiguration configuration)
     {
         services.AddJwtAuthentication(configuration);
-        services.AddRabbitMq(configuration);
         services.AddRedisCache(configuration);
+        services.AddSharedFactories(configuration);
         return services;
     }
 
@@ -71,6 +72,13 @@ public static class ServiceCollectionExtensions
     {
         services.AddSingleton<RedisConnectionHelper>();
         services.AddSingleton<RedisCacheHelper>();
+        return services;
+    }
+
+    public static IServiceCollection AddSharedFactories(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddRabbitMq(configuration);
+        services.AddSingleton<IUserActionFactory, UserActionFactory>();
         return services;
     }
 }
