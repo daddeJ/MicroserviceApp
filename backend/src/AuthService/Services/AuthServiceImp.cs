@@ -5,6 +5,7 @@ using Shared.Caching;
 using Shared.Constants;
 using Shared.DTOs;
 using Shared.Events;
+using Shared.Factories;
 using Shared.Helpers;
 using Shared.Interfaces;
 using Shared.Security;
@@ -18,20 +19,34 @@ namespace AuthService.Services
         private readonly JwtTokenGenerator _generator;
         private readonly RedisCacheHelper _redisCache;
         private readonly IMessagePublisher _messagePublisher;
+        private readonly IUserActionFactory _userActionFactory;
 
         public AuthServiceImp(
             JwtTokenGenerator generator,
             RedisCacheHelper redisCache,
-            IMessagePublisher messagePublisher)
+            IMessagePublisher messagePublisher,
+            IUserActionFactory userActionFactory)
         {
             _generator = generator;
             _redisCache = redisCache;
             _messagePublisher = messagePublisher;
+            _userActionFactory = userActionFactory;
         }
         
-        public async Task HandleAuthTokenEventAsync(Guid userId, string token)
+        public async Task<(bool Success, string[] Errors)> HandleAuthTokenEventAsync(Guid userId, string token)
         {
-            var storedToken = await _redisCache.GetAsync<string>($"user:{userId}:token");
+            var errors = new List<string>();
+
+            if (userId == Guid.Empty)
+                errors.Add("UserId is invalid.");
+
+            if (string.IsNullOrWhiteSpace(token))
+                errors.Add("Token is required.");
+
+            if (errors.Count > 0)
+                return (false, errors.ToArray());
+
+            var storedToken = await _redisCache.GetStringAsync($"user:{userId}:token");
 
             var isValid = storedToken != null && storedToken == token;
             var action = isValid ? "user_validated" : "token_validation_failed";
@@ -44,6 +59,11 @@ namespace AuthService.Services
             };
 
             await _messagePublisher.PublishAsync(QueueNames.AuthActivity, authActivity);
+
+            if (!isValid)
+                errors.Add("Token does not match or has expired.");
+
+            return (isValid, errors.ToArray());
         }
         
         public async Task HandleUserAuthenticationTokenAsync(Guid userId)
@@ -103,6 +123,20 @@ namespace AuthService.Services
                 Timestamp = DateTime.UtcNow
             };
             await _messagePublisher.PublishAsync(QueueNames.UserActivity, userActivity);
+            
+            var meta = _userActionFactory.GetMetadata(UserActionConstants.Authentication.TokenGenerated);
+
+            var logEvent = new UserActivityEvent(
+                userId: userId,
+                action: meta.Action,
+                category: meta.Category,
+                description: meta.Description,
+                defaultLogLevel: meta.DefaultLogLevel,
+                timestamp: DateTime.UtcNow,
+                metadata: null);
+        
+        
+            await _messagePublisher.PublishAsync(QueueNames.LoggerActivity, logEvent);
         }
     }
 }

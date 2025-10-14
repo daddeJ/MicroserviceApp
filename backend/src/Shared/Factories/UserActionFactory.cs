@@ -36,6 +36,13 @@ public class UserActionFactory : IUserActionFactory
                     Description = "Session expired",
                     DefaultLogLevel = "Warning"
                 },
+                UserActionConstants.Authentication.TokenGenerated => new UserActionMetadata
+                {
+                    Action = action,
+                    Category = "Authentication",
+                    Description = "Token generated",
+                    DefaultLogLevel = "Information"
+                },
 
                 UserActionConstants.Registration.Register => new UserActionMetadata
                 {

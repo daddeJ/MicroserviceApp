@@ -23,7 +23,7 @@ public class ValidationBuilder<T>
             var valid = predicate(_model);
             if (!valid)
             {
-                await _publisherService.PublishLogAsync(null, UserActionConstants.Validation.ModelValidation);
+                await _publisherService.PublishLogAsync(Guid.Empty, UserActionConstants.Validation.ModelValidation);
             }
             return (valid, field, valid ? null : errorMessage);
         });

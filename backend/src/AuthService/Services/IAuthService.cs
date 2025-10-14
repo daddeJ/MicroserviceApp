@@ -4,6 +4,6 @@ namespace AuthService.Services;
 
 public interface IAuthService
 {
-    Task HandleAuthTokenEventAsync(Guid userId, string token);
+    Task<(bool Success, string[] Errors)>  HandleAuthTokenEventAsync(Guid userId, string token);
     Task HandleUserAuthenticationTokenAsync(Guid userId);
 }

@@ -4,5 +4,6 @@ namespace BlazorWasm.Services;
 
 public interface IUserApiClient
 {
-    Task<RegisterResponse?> RegisterAsync(RegisterRequest registerRequest);
+    Task<ApiResponse<AuthData>?> LoginAsync(LoginRequest loginRequest);
+    Task<ApiResponse<AuthData>?> RegisterAsync(RegisterRequest registerRequest);
 }

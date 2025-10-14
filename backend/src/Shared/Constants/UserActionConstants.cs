@@ -9,6 +9,7 @@ public static class UserActionConstants
         public const string RefreshToken = "user.refresh_token";
         public const string FailedLogin = "user.failed_login";
         public const string SessionExpired = "user.session_expired";
+        public const string TokenGenerated = "user.token_generated";
     }
 
     public static class Registration
