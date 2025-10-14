@@ -44,6 +44,13 @@ public class UserActionFactory : IUserActionFactory
                     Description = "User registered successfully",
                     DefaultLogLevel = "Information"
                 },
+                UserActionConstants.Registration.FailedRegistration => new UserActionMetadata
+                {
+                    Action = action,
+                    Category = "Registration",
+                    Description = "User failed registration",
+                    DefaultLogLevel = "Warning"
+                },
                 UserActionConstants.Registration.EmailVerification => new UserActionMetadata
                 {
                     Action = action,
@@ -100,6 +107,13 @@ public class UserActionFactory : IUserActionFactory
                     Action = action,
                     Category = "Validation",
                     Description = "Role validation failed",
+                    DefaultLogLevel = "Warning"
+                },
+                UserActionConstants.Validation.TierValidation => new UserActionMetadata
+                {
+                    Action = action,
+                    Category = "Validation",
+                    Description = "Tier validation failed",
                     DefaultLogLevel = "Warning"
                 },
                 UserActionConstants.Validation.TokenValidation => new UserActionMetadata

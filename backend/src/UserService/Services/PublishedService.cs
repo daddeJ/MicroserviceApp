@@ -17,7 +17,7 @@ public class PublishedService : IPublisherService
         _userActionFactory = userActionFactory;
         _messagePublisher = messagePublisher;
     }
-    public async Task PublishLogAsync(Guid userId, string action, string? metadata = null)
+    public async Task PublishLogAsync(Guid? userId, string action, string? metadata = null)
     {
         var meta = _userActionFactory.GetMetadata(action);
 
@@ -29,6 +29,7 @@ public class PublishedService : IPublisherService
             defaultLogLevel: meta.DefaultLogLevel,
             timestamp: DateTime.UtcNow,
             metadata: metadata);
+        
         
         await _messagePublisher.PublishAsync(QueueNames.LoggerActivity, logEvent);
     }
