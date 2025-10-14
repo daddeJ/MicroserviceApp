@@ -1,9 +1,15 @@
 using LoggerService.Consumers;
+using LoggerService.Data;
 using LoggerService.Factories;
 using LoggerService.Services;
+using Microsoft.EntityFrameworkCore;
 using Serilog;
+using Serilog.Debugging;
 using Serilog.Events;
+using Serilog.Sinks.MSSqlServer;
 using Shared.Extensions;
+
+SelfLog.Enable(msg => Console.WriteLine($"SERILOG ERROR: {msg}"));
 
 try
 {
@@ -28,6 +34,8 @@ try
     // ========================
     builder.Host.UseSerilog((context, services, configuration) =>
     {
+        var connectionString = context.Configuration.GetConnectionString("LoggerServiceConnection");
+        
         configuration
             .ReadFrom.Configuration(context.Configuration)
             .Enrich.FromLogContext()
@@ -40,16 +48,42 @@ try
                 retainedFileCountLimit: 7,
                 restrictedToMinimumLevel: LogEventLevel.Information);
 
-        // Uncomment this when DB is ready
-        // .WriteTo.Async(a => a.MSSqlServer(
-        //     connectionString: context.Configuration.GetConnectionString("LoggerServiceConnection"),
-        //     sinkOptions: new MSSqlServerSinkOptions
-        //     {
-        //         TableName = "ApplicationLogs",
-        //         AutoCreateSqlTable = true
-        //     },
-        //     restrictedToMinimumLevel: LogEventLevel.Information
-        // ));
+        if (!string.IsNullOrEmpty(connectionString))
+        {
+            try
+            {
+                var columnOptions = new ColumnOptions();
+                
+                columnOptions.Store.Remove(StandardColumn.Properties);
+                columnOptions.Store.Add(StandardColumn.LogEvent);
+                
+
+                configuration.WriteTo.MSSqlServer(
+                    connectionString: connectionString,
+                    sinkOptions: new MSSqlServerSinkOptions
+                    {
+                        TableName = "ApplicationLogs",
+                        SchemaName = "dbo",
+                        AutoCreateSqlTable = true,
+                        BatchPostingLimit = 50,
+                        BatchPeriod = TimeSpan.FromSeconds(5)
+                    },
+                    columnOptions: columnOptions,
+                    restrictedToMinimumLevel: LogEventLevel.Information
+                );
+                
+                Console.WriteLine("SQL Server sink configured successfully");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Failed to configure SQL Server sink: {ex.Message}");
+                Console.WriteLine($"Stack trace: {ex.StackTrace}");
+            }
+        }
+        else
+        {
+            Console.WriteLine("WARNING: LoggerServiceConnection is null or empty!");
+        }
     });
 
     Log.Information("=== Starting Logger Service ===");
@@ -57,14 +91,16 @@ try
     // ========================
     // Add DbContext (commented out for now)
     // ========================
-    // builder.Services.AddDbContext<LoggerDbContext>(options =>
-    //     options.UseSqlServer(builder.Configuration.GetConnectionString("LoggerServiceConnection")));
+    builder.Services.AddDbContext<LoggerDbContext>(options =>
+        options.UseSqlServer(builder.Configuration.GetConnectionString("LoggerServiceConnection")));
 
     var app = builder.Build();
 
     app.UseSerilogRequestLogging();
 
     Log.Information("LoggerService is running...");
+    Log.Warning("Test warning log");
+    Log.Error("Test error log");
     app.Run();
 }
 catch (Exception ex)
