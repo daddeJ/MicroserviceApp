@@ -23,8 +23,7 @@ builder.Services.AddCors(options =>
 
 builder.Configuration.AddUserSecrets<Program>();
 
-builder.Services.AddRedisCache(builder.Configuration);
-builder.Services.AddRabbitMq(builder.Configuration);
+builder.Services.AddSharedFactories(builder.Configuration);
 
 builder.Services.AddSingleton<IEventPublisher, EventPublisher>();
 

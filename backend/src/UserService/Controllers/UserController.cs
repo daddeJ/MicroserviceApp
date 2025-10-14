@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+using System.Diagnostics;
 using System.Security.Claims;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
@@ -6,10 +8,10 @@ using Microsoft.AspNetCore.Mvc;
 using Shared.Caching;
 using Shared.Constants;
 using Shared.DTOs;
-using Shared.Helpers;
-using Shared.Models;
+using UserService.Builders;
 using UserService.Data;
 using UserService.Data.Transactions;
+using UserService.DTOs;
 using UserService.Helpers;
 using UserService.Services;
 
@@ -42,29 +44,31 @@ public class UserController : ControllerBase
     [AllowAnonymous]
     public async Task<IActionResult> Register([FromBody] RegistrationDto model)
     {
-        if (!ModelState.IsValid)
+        var builder = BuildRegistrationValidation(model);
+        var validationResult = await builder.ValidateAsync();
+
+        if (validationResult != null && !validationResult.Value.IsValid)
         {
-            await _publisherService.PublishLogAsync(Guid.Empty, UserActionConstants.Validation.ModelValidation, JsonSerializer.Serialize(model));
-            return ApiResponseFactory.ValidationFromModelState(ModelState);
+            return ApiResponseFactory.ValidationError(validationResult.Value.Field, validationResult.Value.ErrorMessage);
         }
 
         var user = new ApplicationUser { UserName = model.UserName, Email = model.Email };
 
         if (string.IsNullOrEmpty(model.Role))
         {
-            await _publisherService.PublishLogAsync(Guid.Empty, UserActionConstants.Validation.RoleValidation);
+            await _publisherService.PublishLogAsync(null, UserActionConstants.Validation.RoleValidation);
             return ApiResponseFactory.ValidationError("Role", "Role is required");
         }
 
         if (!DataSeeder.RoleTierMap.TryGetValue(model.Role, out var expectedTier))
         {
-            await _publisherService.PublishLogAsync(Guid.Empty, UserActionConstants.Validation.RoleValidation, model.Role);
+            await _publisherService.PublishLogAsync(null, UserActionConstants.Validation.RoleValidation);
             return ApiResponseFactory.InvalidAllowedValues("Role", model.Role, DataSeeder.RoleTierMap.Keys);
         }
 
         if (!string.Equals(expectedTier.ToString(), model.Tier.ToString(), StringComparison.OrdinalIgnoreCase))
         {
-            await _publisherService.PublishLogAsync(Guid.Empty, UserActionConstants.Validation.TierValidation, model.Tier.ToString());
+            await _publisherService.PublishLogAsync(null, UserActionConstants.Validation.TierValidation);
             return ApiResponseFactory.InvalidAllowedValues("Tier", model.Tier, new[] { expectedTier });
         }
 
@@ -72,7 +76,7 @@ public class UserController : ControllerBase
 
         if (!success)
         {
-            await _publisherService.PublishLogAsync(Guid.Parse(user.Id), UserActionConstants.Registration.Register, JsonSerializer.Serialize(error));
+            await _publisherService.PublishLogAsync(Guid.Parse(user.Id), UserActionConstants.Registration.FailedRegistration);
             return ApiResponseFactory.ValidationCustom("User creation failed", details: new Dictionary<string, string[]> { { "IdentityErrors", error } });
         }
 
@@ -98,10 +102,12 @@ public class UserController : ControllerBase
     [AllowAnonymous]
     public async Task<IActionResult> Login([FromBody] LoginDto model)
     {
-        if (!ModelState.IsValid)
+        var builder = BuildRegistrationValidation(model);
+        var validationResult = await builder.ValidateAsync();
+
+        if (validationResult != null && !validationResult.Value.IsValid)
         {
-            await _publisherService.PublishLogAsync(Guid.Empty, UserActionConstants.Validation.ModelValidation, JsonSerializer.Serialize(model));
-            return ApiResponseFactory.ValidationFromModelState(ModelState);
+            return ApiResponseFactory.ValidationError(validationResult.Value.Field, validationResult.Value.ErrorMessage);
         }
 
         var user = await _userManager.FindByNameAsync(model.Username);
@@ -145,4 +151,28 @@ public class UserController : ControllerBase
         }, "Login successful");
     }
 
+    private ValidationBuilder<RegistrationDto> BuildRegistrationValidation(RegistrationDto model)
+    {
+        return new ValidationBuilder<RegistrationDto>(model, _publisherService)
+            .Rule(m => !string.IsNullOrEmpty(m.Email) && new EmailAddressAttribute().IsValid(m.Email),
+                "Email", "Invalid email address")
+            .Rule(m => !string.IsNullOrEmpty(m.UserName) && m.UserName.Length >= 6,
+                "UserName", "UserName must have at least 6 characters")
+            .Rule(m => !string.IsNullOrEmpty(m.Password) && m.Password.Length >= 6,
+                "Password", "Password must have at least 6 characters")
+            .Rule(m => m.Password == m.ConfirmPassword,
+                "ConfirmPassword", "Passwords do not match")
+            .Rule(m => QueryValidationHelper.TryValidateStringList(m.Role, DataSeeder.RoleTierMap.Keys.ToList(), out _, out var error),
+                "Role", "Invalid role")
+            .Rule(m => QueryValidationHelper.TryValidateIntList(m.Tier.ToString(), Enumerable.Range(0, 6).ToList(), out _, out var error),
+                "Tier", "Invalid tier");
+    }
+    private ValidationBuilder<LoginDto> BuildRegistrationValidation(LoginDto model)
+    {
+        return new ValidationBuilder<LoginDto>(model, _publisherService)
+            .Rule(m => !string.IsNullOrEmpty(m.Username) && m.Username.Length >= 6,
+                "UserName", "UserName must have at least 6 characters")
+            .Rule(m => !string.IsNullOrEmpty(m.Password) && m.Password.Length >= 6,
+                "Password", "Password must have at least 6 characters");
+    }
 }

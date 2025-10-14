@@ -7,13 +7,14 @@ public static class UserActionConstants
         public const string Login = "user.login";
         public const string Logout = "user.logout";
         public const string RefreshToken = "user.refresh_token";
-        public const string FailedLogin = "user.faild_login";
+        public const string FailedLogin = "user.failed_login";
         public const string SessionExpired = "user.session_expired";
     }
 
     public static class Registration
     {
         public const string Register = "user.register";
+        public const string FailedRegistration = "user.failed_register";
         public const string EmailVerification = "user.email_verification";
         public const string AccountActivated = "user.account_activated";
     }

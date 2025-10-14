@@ -15,7 +15,6 @@ public static class ServiceCollectionExtensions
         IConfiguration configuration)
     {
         services.AddJwtAuthentication(configuration);
-        services.AddRedisCache(configuration);
         services.AddSharedFactories(configuration);
         return services;
     }
@@ -78,6 +77,7 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddSharedFactories(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddRabbitMq(configuration);
+        services.AddRedisCache(configuration);
         services.AddSingleton<IUserActionFactory, UserActionFactory>();
         return services;
     }
