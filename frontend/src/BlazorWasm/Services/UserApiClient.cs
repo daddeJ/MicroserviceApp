@@ -11,13 +11,16 @@ public class UserApiClient : IUserApiClient
     {
         _httpClient = httpClient;
     }
-    
-    public async Task<RegisterResponse?> RegisterAsync(RegisterRequest registerRequest)
+
+    public async Task<ApiResponse<AuthData>?> LoginAsync(LoginRequest loginRequest)
+    {
+        var response = await _httpClient.PostAsJsonAsync("api/user/login", loginRequest);
+        return await response.Content.ReadFromJsonAsync<ApiResponse<AuthData>>();
+    }
+
+    public async Task<ApiResponse<AuthData>?> RegisterAsync(RegisterRequest registerRequest)
     {
         var response = await _httpClient.PostAsJsonAsync("api/user/register", registerRequest);
-        if (!response.IsSuccessStatusCode)
-            return null;
-        
-        return await response.Content.ReadFromJsonAsync<RegisterResponse>();
+        return await response.Content.ReadFromJsonAsync<ApiResponse<AuthData>>();
     }
 }

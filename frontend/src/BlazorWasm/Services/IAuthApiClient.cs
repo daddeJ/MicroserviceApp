@@ -4,5 +4,5 @@ namespace BlazorWasm.Services;
 
 public interface IAuthApiClient
 {
-    Task<AuthResponse?> LoginAsync(LoginRequest loginRequest);
+    Task<ApiResponse<ValidateToken>?> ValidateTokenAsync(string userId, string token);
 }

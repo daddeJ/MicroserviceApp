@@ -1,6 +1,8 @@
 @page "/register"
+@using BlazorWasm.Models
 @using BlazorWasm.Services
 @inject IUserApiClient UserApiClient
+@inject IAuthApiClient AuthApiClient
 @inject ITokenService TokenService
 @inject NavigationManager NavManager
 @inject AuthenticationStateProvider AuthStateProvider
@@ -9,28 +11,33 @@
 
 <div style="max-width: 400px; margin: 2rem auto; padding: 1rem; border: 1px solid #ccc; border-radius: 8px;">
     <div style="margin-bottom: 1rem;">
-        <label for="fullname">Full Name</label><br />
-        <input id="fullname" @bind="_fullname" placeholder="Enter full name" style="width: 100%; padding: 0.5rem;" />
+        <label for="email">Email</label><br />
+        <input id="email" @bind="_registerRequest.Email" placeholder="Enter email" style="width: 100%; padding: 0.5rem;" />
     </div>
 
     <div style="margin-bottom: 1rem;">
         <label for="username">Username</label><br />
-        <input id="username" @bind="_username" placeholder="Enter username" style="width: 100%; padding: 0.5rem;" />
-    </div>
-
-    <div style="margin-bottom: 1rem;">
-        <label for="email">Email</label><br />
-        <input id="email" @bind="_email" placeholder="Enter email" style="width: 100%; padding: 0.5rem;" />
+        <input id="username" @bind="_registerRequest.Username" placeholder="Enter username" style="width: 100%; padding: 0.5rem;" />
     </div>
 
     <div style="margin-bottom: 1rem;">
         <label for="password">Password</label><br />
-        <input id="password" type="password" @bind="_password" placeholder="Enter password" style="width: 100%; padding: 0.5rem;" />
+        <input id="password" type="password" @bind="_registerRequest.Password" placeholder="Enter password" style="width: 100%; padding: 0.5rem;" />
     </div>
 
     <div style="margin-bottom: 1rem;">
-        <label for="passwordConfirmation">Confirm Password</label><br />
-        <input id="passwordConfirmation" type="password" @bind="_passwordConfirmation" placeholder="Confirm password" style="width: 100%; padding: 0.5rem;" />
+        <label for="confirmPassword">Confirm Password</label><br />
+        <input id="confirmPassword" type="password" @bind="_registerRequest.ConfirmPassword" placeholder="Confirm password" style="width: 100%; padding: 0.5rem;" />
+    </div>
+
+    <div style="margin-bottom: 1rem;">
+        <label for="role">Role</label><br />
+        <input id="role" @bind="_registerRequest.Role" placeholder="Enter role (optional)" style="width: 100%; padding: 0.5rem;" />
+    </div>
+
+    <div style="margin-bottom: 1rem;">
+        <label for="tier">Tier</label><br />
+        <input id="tier" type="number" @bind="_registerRequest.Tier" style="width: 100%; padding: 0.5rem;" />
     </div>
 
     <div style="display: flex; gap: 1rem;">
@@ -45,42 +52,36 @@
 </div>
 
 @code {
-    private string _fullname = string.Empty;
-    private string _username = string.Empty;
-    private string _email = string.Empty;
-    private string _password = string.Empty;
-    private string _passwordConfirmation = string.Empty;
+    private RegisterRequest _registerRequest = new();
     private string _errorMessage = string.Empty;
 
     private async Task RegisterAsync()
     {
-        if (_password != _passwordConfirmation)
+        if (_registerRequest.Password != _registerRequest.ConfirmPassword)
         {
             _errorMessage = "Passwords do not match.";
             return;
         }
 
-        var success = await UserApiClient.RegisterAsync(new()
+        var response = await UserApiClient.RegisterAsync(_registerRequest);
+        
+        if (!response.Success)
         {
-            FullName = _fullname,
-            Username = _username,
-            Email = _email,
-            Password = _password,
-            PasswordConfirmation = _passwordConfirmation
-        });
+            _errorMessage = string.Join(", ", response.Error ?? new[] { "Registration failed." });
+            return;
+        }
+        
+        var validateAuth = await AuthApiClient.ValidateTokenAsync(response.Data.User.UserId, response.Data.Token);
 
-        if (success != null)
+        if (!validateAuth.Success)
         {
-            await TokenService.SaveTokenAsync(success.Token);
-            
-            ((CustomAuthStateProvider)AuthStateProvider).NotifyAuthStateChanged();
-            
-            NavManager.NavigateTo("/");
+            _errorMessage = string.Join(", ", response.Error ?? new[] { "Token is not valid. Please try again." });
+            return;
         }
-        else
-        {
-            _errorMessage = "Registration failed. Please try again.";
-        }
+
+        await TokenService.SaveTokenAsync(response.Data.Token);
+        ((CustomAuthStateProvider)AuthStateProvider).NotifyAuthStateChanged();
+        NavManager.NavigateTo("/");
     }
 
     private void GoToLogin()

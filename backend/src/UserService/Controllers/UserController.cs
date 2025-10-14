@@ -56,19 +56,19 @@ public class UserController : ControllerBase
 
         if (string.IsNullOrEmpty(model.Role))
         {
-            await _publisherService.PublishLogAsync(null, UserActionConstants.Validation.RoleValidation);
+            await _publisherService.PublishLogAsync(Guid.Empty, UserActionConstants.Validation.RoleValidation);
             return ApiResponseFactory.ValidationError("Role", "Role is required");
         }
 
         if (!DataSeeder.RoleTierMap.TryGetValue(model.Role, out var expectedTier))
         {
-            await _publisherService.PublishLogAsync(null, UserActionConstants.Validation.RoleValidation);
+            await _publisherService.PublishLogAsync(Guid.Empty, UserActionConstants.Validation.RoleValidation);
             return ApiResponseFactory.InvalidAllowedValues("Role", model.Role, DataSeeder.RoleTierMap.Keys);
         }
 
         if (!string.Equals(expectedTier.ToString(), model.Tier.ToString(), StringComparison.OrdinalIgnoreCase))
         {
-            await _publisherService.PublishLogAsync(null, UserActionConstants.Validation.TierValidation);
+            await _publisherService.PublishLogAsync(Guid.Empty, UserActionConstants.Validation.TierValidation);
             return ApiResponseFactory.InvalidAllowedValues("Tier", model.Tier, new[] { expectedTier });
         }
 
@@ -79,6 +79,8 @@ public class UserController : ControllerBase
             await _publisherService.PublishLogAsync(Guid.Parse(user.Id), UserActionConstants.Registration.FailedRegistration);
             return ApiResponseFactory.ValidationCustom("User creation failed", details: new Dictionary<string, string[]> { { "IdentityErrors", error } });
         }
+        
+        await _publisherService.PublishLogAsync(Guid.Parse(user.Id), UserActionConstants.Registration.Register);
 
         var userTemp = new UserDto
         {
@@ -91,9 +93,7 @@ public class UserController : ControllerBase
 
         var userDetail = await _userService.AuthenticateUserAsync(userTemp, QueueNames.UserActionRegister);
         var tokenValue = await _redisCacheHelper.WaitForValueAsync($"user:{userDetail.UserId}:token");
-
-        await _publisherService.PublishLogAsync(userDetail.UserId, UserActionConstants.Registration.Register);
-
+        
         return ApiResponseFactory.Ok(new { User = userDetail, Token = tokenValue }, "User registered successfully");
     }
 

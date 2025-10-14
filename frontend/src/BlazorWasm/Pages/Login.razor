@@ -1,7 +1,8 @@
 @page "/login"
 @using BlazorWasm.Services
-
+@using BlazorWasm.Models
 @inject IAuthApiClient AuthApiClient
+@inject IUserApiClient UserApiClient
 @inject ITokenService TokenService
 @inject NavigationManager NavManager
 @inject AuthenticationStateProvider AuthStateProvider
@@ -11,12 +12,12 @@
 <div style="max-width: 400px; margin: 2rem auto; padding: 1rem; border: 1px solid #ccc; border-radius: 8px;">
     <div style="margin-bottom: 1rem;">
         <label for="username">Username</label><br />
-        <input id="username" @bind="_username" placeholder="Enter username" style="width: 100%; padding: 0.5rem;" />
+        <input id="username" @bind="_loginRequest.Username" placeholder="Enter username" style="width: 100%; padding: 0.5rem;" />
     </div>
 
     <div style="margin-bottom: 1rem;">
         <label for="password">Password</label><br />
-        <input id="password" type="password" @bind="_password" placeholder="Enter password" style="width: 100%; padding: 0.5rem;" />
+        <input id="password" type="password" @bind="_loginRequest.Password" placeholder="Enter password" style="width: 100%; padding: 0.5rem;" />
     </div>
 
     <div style="display: flex; gap: 1rem;">
@@ -30,10 +31,8 @@
     }
 </div>
 
-
 @code {
-    private string _username = string.Empty;
-    private string _password = string.Empty;
+    private LoginRequest _loginRequest = new();  // Strongly typed model
     private string _errorMessage = string.Empty;
 
     protected override async Task OnInitializedAsync()
@@ -49,31 +48,28 @@
 
     private async Task LoginAsync()
     {
-        var result = await AuthApiClient.LoginAsync(new()
+        _errorMessage = string.Empty;
+
+        var response = await UserApiClient.LoginAsync((_loginRequest));
+        
+        if (!response.Success)
         {
-            Username = _username,
-            Password = _password
-        });
-
-        if (result != null)
-        {
-            await TokenService.SaveTokenAsync(result.Token);
-
-            if (AuthStateProvider is CustomAuthStateProvider customProvider)
-            {
-                customProvider.NotifyAuthStateChanged();
-            }
-
-            NavManager.NavigateTo("/");
+            _errorMessage = string.Join(", ", response.Error ?? new[] { "Login failed." });
+            return;
         }
-        else
+        
+        var validateAuth = await AuthApiClient.ValidateTokenAsync(response.Data.User.UserId, response.Data.Token);
+
+        if (!validateAuth.Success)
         {
-            _errorMessage = "Invalid username or password.";
+            _errorMessage = string.Join(", ", response.Error ?? new[] { "Token is not valid. Please try again." });
+            return;
         }
+
+        await TokenService.SaveTokenAsync(response.Data.Token);
+        ((CustomAuthStateProvider)AuthStateProvider).NotifyAuthStateChanged();
+        NavManager.NavigateTo("/");
     }
 
-    private void GoToRegister()
-    {
-        NavManager.NavigateTo("/register");
-    }
+    private void GoToRegister() => NavManager.NavigateTo("/register");
 }

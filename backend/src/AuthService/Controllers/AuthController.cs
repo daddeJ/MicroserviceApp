@@ -3,6 +3,7 @@ using AuthService.Services;
 using Microsoft.AspNetCore.Identity.Data;
 using Microsoft.AspNetCore.Mvc;
 using Shared.DTOs;
+using Shared.Models;
 
 namespace AuthService.Controllers;
 
@@ -21,11 +22,23 @@ public class AuthController : ControllerBase
     public async Task<IActionResult> ValidateToken([FromBody] TokenValidationRequestDto dto)
     {
         if (dto.UserId == Guid.Empty || string.IsNullOrWhiteSpace(dto.Token))
-            return BadRequest("Invalid request");
+        {
+            var response = ApiResponse<string>.Fail("Invalid request", "INVALID_REQUEST");
+            return BadRequest(response);
+        }
 
-        // Call AuthService to validate token
-        await _authService.HandleAuthTokenEventAsync(dto.UserId, dto.Token);
+        var isValid = await _authService.HandleAuthTokenEventAsync(dto.UserId, dto.Token);
 
-        return Ok(new { Message = "Token validation attempted. Activity logged if valid." });
+        if (isValid.Success)
+        {
+            var response = ApiResponse<object>.Ok(
+                new { UserId = dto.UserId, Token = dto.Token },
+                "Token is valid and activity logged."
+            );
+            return Ok(response);
+        }
+
+        var failedResponse = ApiResponse<object>.Fail("Token validation failed", "INVALID_TOKEN");
+        return Unauthorized(failedResponse);
     }
 }
