@@ -1,3 +1,8 @@
+using System.ComponentModel.DataAnnotations;
+using Shared.DTOs;
+using UserService.Builders;
+using UserService.DTOs;
+
 namespace UserService.Helpers;
 
 public static class QueryValidationHelper
@@ -59,5 +64,31 @@ public static class QueryValidationHelper
         }
         
         return true;
+    }
+    
+    public static ValidationBuilder<RegistrationDto> BuildRegistrationValidation(RegistrationDto model)
+    {
+        return new ValidationBuilder<RegistrationDto>(model)
+            .Rule(m => !string.IsNullOrEmpty(m.Email) && new EmailAddressAttribute().IsValid(m.Email),
+                "Email", "Invalid email address")
+            .Rule(m => !string.IsNullOrEmpty(m.UserName) && m.UserName.Length >= 6,
+                "UserName", "UserName must have at least 6 characters")
+            .Rule(m => !string.IsNullOrEmpty(m.Password) && m.Password.Length >= 6,
+                "Password", "Password must have at least 6 characters")
+            .Rule(m => m.Password == m.ConfirmPassword,
+                "ConfirmPassword", "Passwords do not match")
+            .Rule(m => QueryValidationHelper.TryValidateStringList(m.Role, DataSeeder.RoleTierMap.Keys.ToList(), out _, out var error),
+                "Role", "Invalid role")
+            .Rule(m => QueryValidationHelper.TryValidateIntList(m.Tier.ToString(), Enumerable.Range(0, 6).ToList(), out _, out var error),
+                "Tier", "Invalid tier");
+    }
+    
+    public static ValidationBuilder<LoginDto> BuildLoginValidation(LoginDto model)
+    {
+        return new ValidationBuilder<LoginDto>(model)
+            .Rule(m => !string.IsNullOrEmpty(m.Username) && m.Username.Length >= 6,
+                "Username", "Username must have at least 6 characters")
+            .Rule(m => !string.IsNullOrEmpty(m.Password) && m.Password.Length >= 6,
+                "Password", "Password must have at least 6 characters");
     }
 }

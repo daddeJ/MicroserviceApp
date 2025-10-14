@@ -1,16 +1,12 @@
 using System.Security.Claims;
-using AuthService.Messaging;
-using Newtonsoft.Json;
 using Shared.Caching;
 using Shared.Constants;
 using Shared.DTOs;
 using Shared.Events;
 using Shared.Factories;
-using Shared.Helpers;
 using Shared.Interfaces;
 using Shared.Security;
 using ClaimTypes = Shared.Constants.ClaimTypes;
-using JsonSerializerOptions = System.Text.Json.JsonSerializerOptions;
 
 namespace AuthService.Services
 {
@@ -134,7 +130,6 @@ namespace AuthService.Services
                 defaultLogLevel: meta.DefaultLogLevel,
                 timestamp: DateTime.UtcNow,
                 metadata: null);
-        
         
             await _messagePublisher.PublishAsync(QueueNames.LoggerActivity, logEvent);
         }
