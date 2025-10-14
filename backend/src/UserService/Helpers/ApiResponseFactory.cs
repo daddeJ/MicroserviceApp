@@ -1,6 +1,10 @@
+using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
+using Shared.DTOs;
 using Shared.Models;
+using UserService.Builders;
+using UserService.DTOs;
 
 namespace UserService.Helpers;
 
@@ -31,6 +35,39 @@ public static class ApiResponseFactory
         {
             StatusCode = 500
         };
+
+    public static IActionResult? ValidateModel<T>(T model) where T : class
+    {
+        ValidationBuilder<T>? builder = model switch
+        {
+            RegistrationDto registrationDto => QueryValidationHelper.BuildRegistrationValidation(registrationDto) as ValidationBuilder<T>,
+            LoginDto loginDto => QueryValidationHelper.BuildLoginValidation(loginDto) as ValidationBuilder<T>,
+            _ => null
+        };
+
+        if (builder == null)
+        {
+            return null;
+        }
+
+        var validationResult = builder.Validate();
+
+        if (validationResult == null)
+        {
+            return null;
+        }
+
+        var errors = new Dictionary<string, string[]>
+        {
+            { validationResult.Value.Field ?? "Unknown", new[] { validationResult.Value.ErrorMessage ?? "Validation error" } }
+        };
+
+        return BadRequest<object>(
+            validationResult.Value.ErrorMessage ?? "Validation failed.",
+            "VAL_003",
+            errors
+        );
+    }
 
     public static IActionResult ValidationFromModelState(ModelStateDictionary modelState)
     {
@@ -89,4 +126,5 @@ public static class ApiResponseFactory
         string errorCode = "VAL_005",
         Dictionary<string, string[]>? details = null)
         => BadRequest<object>(message, errorCode, details);
+    
 }

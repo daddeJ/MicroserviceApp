@@ -23,9 +23,10 @@ public class UserController : ControllerBase
 {
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly IUserService _userService;
-    private readonly RedisCacheHelper  _redisCacheHelper;
+    private readonly RedisCacheHelper _redisCacheHelper;
     private readonly IUserRegistrationTransaction _userRegistrationTransaction;
     private readonly IPublisherService _publisherService;
+
     public UserController(
         UserManager<ApplicationUser> userManager,
         IUserService userService,
@@ -44,12 +45,11 @@ public class UserController : ControllerBase
     [AllowAnonymous]
     public async Task<IActionResult> Register([FromBody] RegistrationDto model)
     {
-        var builder = BuildRegistrationValidation(model);
-        var validationResult = await builder.ValidateAsync();
-
-        if (validationResult != null && !validationResult.Value.IsValid)
+        var validationError = ApiResponseFactory.ValidateModel(model);
+        if (validationError != null)
         {
-            return ApiResponseFactory.ValidationError(validationResult.Value.Field, validationResult.Value.ErrorMessage);
+            await _publisherService.PublishLogAsync(Guid.Empty, UserActionConstants.Validation.ModelValidation);
+            return validationError;
         }
 
         var user = new ApplicationUser { UserName = model.UserName, Email = model.Email };
@@ -77,9 +77,11 @@ public class UserController : ControllerBase
         if (!success)
         {
             await _publisherService.PublishLogAsync(Guid.Parse(user.Id), UserActionConstants.Registration.FailedRegistration);
-            return ApiResponseFactory.ValidationCustom("User creation failed", details: new Dictionary<string, string[]> { { "IdentityErrors", error } });
+            return ApiResponseFactory.ValidationCustom(
+                "User creation failed", 
+                details: new Dictionary<string, string[]> { { "IdentityErrors", error } });
         }
-        
+
         await _publisherService.PublishLogAsync(Guid.Parse(user.Id), UserActionConstants.Registration.Register);
 
         var userTemp = new UserDto
@@ -93,21 +95,20 @@ public class UserController : ControllerBase
 
         var userDetail = await _userService.AuthenticateUserAsync(userTemp, QueueNames.UserActionRegister);
         var tokenValue = await _redisCacheHelper.WaitForValueAsync($"user:{userDetail.UserId}:token");
-        
+
         return ApiResponseFactory.Ok(new { User = userDetail, Token = tokenValue }, "User registered successfully");
     }
 
-    
     [HttpPost("login")]
     [AllowAnonymous]
     public async Task<IActionResult> Login([FromBody] LoginDto model)
     {
-        var builder = BuildRegistrationValidation(model);
-        var validationResult = await builder.ValidateAsync();
-
-        if (validationResult != null && !validationResult.Value.IsValid)
+        // Validate model using ApiResponseFactory
+        var validationError = ApiResponseFactory.ValidateModel(model);
+        if (validationError != null)
         {
-            return ApiResponseFactory.ValidationError(validationResult.Value.Field, validationResult.Value.ErrorMessage);
+            await _publisherService.PublishLogAsync(Guid.Empty, UserActionConstants.Validation.ModelValidation);
+            return validationError;
         }
 
         var user = await _userManager.FindByNameAsync(model.Username);
@@ -149,30 +150,5 @@ public class UserController : ControllerBase
             User = userDetail,
             Token = tokenValue
         }, "Login successful");
-    }
-
-    private ValidationBuilder<RegistrationDto> BuildRegistrationValidation(RegistrationDto model)
-    {
-        return new ValidationBuilder<RegistrationDto>(model, _publisherService)
-            .Rule(m => !string.IsNullOrEmpty(m.Email) && new EmailAddressAttribute().IsValid(m.Email),
-                "Email", "Invalid email address")
-            .Rule(m => !string.IsNullOrEmpty(m.UserName) && m.UserName.Length >= 6,
-                "UserName", "UserName must have at least 6 characters")
-            .Rule(m => !string.IsNullOrEmpty(m.Password) && m.Password.Length >= 6,
-                "Password", "Password must have at least 6 characters")
-            .Rule(m => m.Password == m.ConfirmPassword,
-                "ConfirmPassword", "Passwords do not match")
-            .Rule(m => QueryValidationHelper.TryValidateStringList(m.Role, DataSeeder.RoleTierMap.Keys.ToList(), out _, out var error),
-                "Role", "Invalid role")
-            .Rule(m => QueryValidationHelper.TryValidateIntList(m.Tier.ToString(), Enumerable.Range(0, 6).ToList(), out _, out var error),
-                "Tier", "Invalid tier");
-    }
-    private ValidationBuilder<LoginDto> BuildRegistrationValidation(LoginDto model)
-    {
-        return new ValidationBuilder<LoginDto>(model, _publisherService)
-            .Rule(m => !string.IsNullOrEmpty(m.Username) && m.Username.Length >= 6,
-                "UserName", "UserName must have at least 6 characters")
-            .Rule(m => !string.IsNullOrEmpty(m.Password) && m.Password.Length >= 6,
-                "Password", "Password must have at least 6 characters");
     }
 }
