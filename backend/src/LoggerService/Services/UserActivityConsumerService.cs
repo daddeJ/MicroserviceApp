@@ -15,6 +15,19 @@ public class UserActivityConsumerService : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         Log.Information("Starting UserActivityConsumer...");
-        await _consumer.StartConsumingAsync();
+
+        try
+        {
+            await _consumer.StartConsumingAsync(stoppingToken);
+        }
+        catch (OperationCanceledException)
+        {
+            Log.Information("UserActivityConsumerService stopping due to cancellation.");
+        }
+        catch (Exception ex)
+        {
+            Log.Fatal(ex, "UserActivityConsumerService failed unexpectedly.");
+            throw;
+        }
     }
 }

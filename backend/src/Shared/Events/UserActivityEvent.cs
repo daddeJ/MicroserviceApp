@@ -2,7 +2,7 @@ namespace Shared.Events;
 
 public sealed class UserActivityEvent
 {
-    public Guid UserId { get; set; }
+    public Guid? UserId { get; set; }
     public string Action { get; set; }
     public string Category { get; set; }
     public string Description { get; set; }
@@ -14,7 +14,7 @@ public sealed class UserActivityEvent
     public UserActivityEvent() { }
 
     public UserActivityEvent(
-        Guid userId,
+        Guid? userId,
         string action,
         string category,
         string description,
@@ -22,7 +22,7 @@ public sealed class UserActivityEvent
         DateTime timestamp,
         string? metadata = null)
     {
-        UserId = userId;
+        UserId = userId ?? null;
         Action = action ?? throw new ArgumentNullException(nameof(action));
         Category = category ?? throw new ArgumentNullException(nameof(category));
         Description = description ?? throw new ArgumentNullException(nameof(description));

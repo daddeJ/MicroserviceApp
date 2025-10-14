@@ -20,7 +20,7 @@ public class ActivityConsumer : IActivityConsumer
         _loggerActionFactory = loggerActionFactory;
     }
 
-    public async Task StartConsumingAsync()
+    public async Task StartConsumingAsync(CancellationToken cancellationToken)
     {
         var channel = await _rabbitHelper.GetChannelAsync();
 
@@ -30,29 +30,45 @@ public class ActivityConsumer : IActivityConsumer
             exclusive: false,
             autoDelete: false,
             arguments: null);
-        
+
         var consumer = new AsyncEventingBasicConsumer(channel);
 
         consumer.ReceivedAsync += async (_, ea) =>
         {
             var body = ea.Body.ToArray();
             var message = Encoding.UTF8.GetString(body);
-            
-            var activity = JsonSerializer.Deserialize<UserActivityEvent>(message);
 
-            if (activity != null)
+            try
             {
-                _loggerActionFactory.LogActivity(activity);
+                var activity = JsonSerializer.Deserialize<UserActivityEvent>(message);
+                if (activity != null)
+                {
+                    _loggerActionFactory.LogActivity(activity);
+                }
+
+                await channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
             }
-            
-            await Task.CompletedTask;
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Failed to process message: {Message}", message);
+                await channel.BasicNackAsync(ea.DeliveryTag, multiple: false, requeue: true);
+            }
+
+            await Task.Yield(); 
         };
-        
+
         await channel.BasicConsumeAsync(
-            queue: QueueNames.AuthActivity,
+            queue: QueueNames.LoggerActivity,
             autoAck: false,
-            consumer: consumer
-        );
-        Log.Information("Listening to 'auth.activity' queue...");
+            consumer: consumer);
+
+        Log.Information("Listening to '{Queue}' queue...", QueueNames.LoggerActivity);
+
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            await Task.Delay(1000, cancellationToken);
+        }
+
+        Log.Information("Stopping ActivityConsumer...");
     }
 }
