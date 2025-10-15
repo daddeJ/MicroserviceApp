@@ -89,11 +89,11 @@ Migrations/bin/
 **/Dockerfile.local
 **/Dockerfile.old
 .docker/
-.dockerignore
+# .dockerignore  <-- REMOVE THIS LINE
 docker-compose.override.yml
 docker-compose.debug.yml
 docker-compose.prod.yml
-docker-compose.yml
+# docker-compose.yml  <-- REMOVE THIS LINE (or comment it out)
 # Docker volumes
 **/data/
 **/db_data/

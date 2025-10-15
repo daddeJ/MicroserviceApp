@@ -24,10 +24,14 @@ builder.Services.AddSingleton<IAuthService, AuthServiceImp>();
 builder.Services.AddSingleton<EventConsumer>();
 
 // ========================
-// Configure DbContext
+// Configure DbContext with transient retry
 // ========================
 builder.Services.AddDbContext<AuthDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("AuthServiceConnection")));
+    options.UseSqlServer(
+        builder.Configuration.GetConnectionString("AuthServiceConnection"),
+        sql => sql.EnableRetryOnFailure() // retry transient DB errors
+    )
+);
 
 // ========================
 // Add Controllers & Swagger
@@ -40,6 +44,15 @@ builder.Services.AddSwaggerGen();
 // Build app
 // ========================
 var app = builder.Build();
+
+// ========================
+// Ensure DB exists & migrations applied
+// ========================
+using (var scope = app.Services.CreateScope())
+{
+    var dbContext = scope.ServiceProvider.GetRequiredService<AuthDbContext>();
+    await dbContext.Database.MigrateAsync(); // create DB if missing & apply migrations
+}
 
 // ========================
 // Swagger for development
