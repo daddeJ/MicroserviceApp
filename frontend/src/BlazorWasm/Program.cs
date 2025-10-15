@@ -1,25 +1,22 @@
 using Blazored.LocalStorage;
-using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
+using Microsoft.AspNetCore.Components.Authorization;
 using BlazorWasm;
 using BlazorWasm.Providers;
 using BlazorWasm.Services;
-using Microsoft.AspNetCore.Components.Authorization;
 using MudBlazor.Services;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");
 
-var userServiceUrl = builder.Configuration["ApiUrls:UserService"] 
-                     ?? throw new InvalidOperationException("UserService URL not configured");
-var authServiceUrl = builder.Configuration["ApiUrls:AuthService"] 
-                     ?? throw new InvalidOperationException("AuthService URL not configured");
+var baseUrl = builder.Configuration["ApiUrls:Microservice"]
+              ?? throw new InvalidOperationException("Microservice URL not configured");
 
-builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(userServiceUrl) });
-builder.Services.AddScoped<IAuthApiClient>(sp => 
-    new AuthApiClient(new HttpClient { BaseAddress = new Uri(authServiceUrl) }));
-builder.Services.AddScoped<IUserApiClient>(sp => 
-    new UserApiClient(new HttpClient { BaseAddress = new Uri(userServiceUrl) }));
+builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(baseUrl) });
+
+// Reuse the same base HttpClient for all API clients
+builder.Services.AddScoped<IAuthApiClient, AuthApiClient>();
+builder.Services.AddScoped<IUserApiClient, UserApiClient>();
 
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddAuthorizationCore();
