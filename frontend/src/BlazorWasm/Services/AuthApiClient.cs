@@ -11,12 +11,13 @@ public class AuthApiClient : IAuthApiClient
     {
         _httpClient = httpClient;
     }
-    public async Task<ApiResponse<ValidateToken>?> ValidateTokenAsync(string userId, string token)
+    public async Task<ApiResponse<ValidateToken>?> ValidateTokenAsync(string userId, string token, string operation)
     {
         var validationRequest = new
         {
             userId = userId,
-            token = token
+            token = token,
+            operation = operation
         };
 
         var response = await _httpClient.PostAsJsonAsync("api/auth/validate", validationRequest);

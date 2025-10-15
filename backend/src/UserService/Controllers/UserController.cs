@@ -94,7 +94,7 @@ public class UserController : ControllerBase
         };
 
         var userDetail = await _userService.AuthenticateUserAsync(userTemp, QueueNames.UserActionRegister);
-        var tokenValue = await _redisCacheHelper.WaitForValueAsync($"user:{userDetail.UserId}:token");
+        var tokenValue = await _redisCacheHelper.WaitForValueAsync($"user:{userDetail.UserId}:{UserActionConstants.Validation.RegisteredTokenValidation}");
 
         return ApiResponseFactory.Ok(new { User = userDetail, Token = tokenValue }, "User registered successfully");
     }
@@ -107,7 +107,7 @@ public class UserController : ControllerBase
         var validationError = ApiResponseFactory.ValidateModel(model);
         if (validationError != null)
         {
-            await _publisherService.PublishLogAsync(Guid.Empty, UserActionConstants.Validation.ModelValidation);
+            await _publisherService.PublishLogAsync(Guid.Empty, UserActionConstants.Validation.ModelValidation, UserActionConstants.Validation.LoginTokenValidation);
             return validationError;
         }
 
@@ -121,7 +121,7 @@ public class UserController : ControllerBase
         var passwordValid = await _userManager.CheckPasswordAsync(user, model.Password);
         if (!passwordValid)
         {
-            await _publisherService.PublishLogAsync(Guid.Parse(user.Id), UserActionConstants.Authentication.FailedLogin);
+            await _publisherService.PublishLogAsync(Guid.Parse(user.Id), UserActionConstants.Authentication.FailedLogin, UserActionConstants.Validation.LoginTokenValidation);
             return ApiResponseFactory.Unauthorized<object>("Invalid username or password.");
         }
 
@@ -140,10 +140,10 @@ public class UserController : ControllerBase
 
         var userDetail = await _userService.AuthenticateUserAsync(userTemp, QueueNames.UserActionLogin);
 
-        var tokenKey = $"user:{userDetail.UserId}:token";
+        var tokenKey = $"user:{userDetail.UserId}:{UserActionConstants.Validation.LoginTokenValidation}";
         var tokenValue = await _redisCacheHelper.WaitForValueAsync(tokenKey);
 
-        await _publisherService.PublishLogAsync(userDetail.UserId, UserActionConstants.Authentication.Login);
+        await _publisherService.PublishLogAsync(userDetail.UserId, UserActionConstants.Authentication.Login, UserActionConstants.Validation.LoginTokenValidation);
 
         return ApiResponseFactory.Ok(new
         {

@@ -14,7 +14,14 @@ public class LoggerDbContext : DbContext
         {
             entity.HasKey(e => e.Id);
             entity.ToTable("ApplicationLogs");
-            entity.Property(e => e.Id).ValueGeneratedOnAdd();
+
+            entity.Property(e => e.Id)
+                .ValueGeneratedOnAdd();
+
+            entity.Property(e => e.ApplicationLogId)
+                .HasDefaultValueSql("NEWID()") 
+                .IsRequired();
         });
+
     }
 }

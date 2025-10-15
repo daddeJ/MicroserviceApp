@@ -13,6 +13,7 @@ public class UserRegistrationTransaction : IUserRegistrationTransaction
         _userManager = userManager;
         _userDbContext = dbContext;
     }
+
     public async Task<(bool success, string[] error)> RegisterUserTransactionAsync(
         ApplicationUser user,
         string password,
@@ -37,15 +38,24 @@ public class UserRegistrationTransaction : IUserRegistrationTransaction
                 return (false, roleResult.Errors.Select(e => e.Description).ToArray());
             }
 
-            var existingClaim = await _userManager.GetClaimsAsync(user);
-            if (existingClaim.Any(c => c.Type == "Tier"))
+            var existingClaims = await _userManager.GetClaimsAsync(user);
+            var tierClaim = existingClaims.FirstOrDefault(c => c.Type == "Tier");
+
+            if (tierClaim != null)
             {
-                var claimResult = await _userManager.AddClaimAsync(user, new Claim("Tier", tier.ToString()));
-                if (!claimResult.Succeeded)
+                var removeResult = await _userManager.RemoveClaimAsync(user, tierClaim);
+                if (!removeResult.Succeeded)
                 {
                     await transaction.RollbackAsync();
-                    return (false, claimResult.Errors.Select(e => e.Description).ToArray());
+                    return (false, removeResult.Errors.Select(e => e.Description).ToArray());
                 }
+            }
+
+            var addClaimResult = await _userManager.AddClaimAsync(user, new Claim("Tier", tier.ToString()));
+            if (!addClaimResult.Succeeded)
+            {
+                await transaction.RollbackAsync();
+                return (false, addClaimResult.Errors.Select(e => e.Description).ToArray());
             }
 
             await transaction.CommitAsync();

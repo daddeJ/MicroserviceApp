@@ -1,5 +1,9 @@
+using System.Collections.ObjectModel;
+using System.Data;
 using LoggerService.Consumers;
 using LoggerService.Data;
+using LoggerService.Enricher;
+using LoggerService.Extensions;
 using LoggerService.Factories;
 using LoggerService.Services;
 using Microsoft.EntityFrameworkCore;
@@ -41,6 +45,7 @@ try
             .Enrich.FromLogContext()
             .Enrich.WithCorrelationId()
             .Enrich.WithClientIp()
+            .Enrich.With(new ApplicationLogIdEnricher())
             .WriteTo.Console()
             .WriteTo.File(
                 path: "logs/log-.txt",
@@ -50,46 +55,18 @@ try
 
         if (!string.IsNullOrEmpty(connectionString))
         {
-            try
-            {
-                var columnOptions = new ColumnOptions();
-                
-                columnOptions.Store.Remove(StandardColumn.Properties);
-                columnOptions.Store.Add(StandardColumn.LogEvent);
-                
-
-                configuration.WriteTo.MSSqlServer(
-                    connectionString: connectionString,
-                    sinkOptions: new MSSqlServerSinkOptions
-                    {
-                        TableName = "ApplicationLogs",
-                        SchemaName = "dbo",
-                        AutoCreateSqlTable = true,
-                        BatchPostingLimit = 50,
-                        BatchPeriod = TimeSpan.FromSeconds(5)
-                    },
-                    columnOptions: columnOptions,
-                    restrictedToMinimumLevel: LogEventLevel.Information
-                );
-                
-                Console.WriteLine("SQL Server sink configured successfully");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Failed to configure SQL Server sink: {ex.Message}");
-                Console.WriteLine($"Stack trace: {ex.StackTrace}");
-            }
+            configuration.AddCustomSqlLogger(connectionString);
         }
         else
         {
-            Console.WriteLine("WARNING: LoggerServiceConnection is null or empty!");
+            Console.WriteLine("⚠️ WARNING: LoggerServiceConnection is null or empty!");
         }
     });
 
     Log.Information("=== Starting Logger Service ===");
 
     // ========================
-    // Add DbContext (commented out for now)
+    // Add DbContext
     // ========================
     builder.Services.AddDbContext<LoggerDbContext>(options =>
         options.UseSqlServer(builder.Configuration.GetConnectionString("LoggerServiceConnection")));
@@ -101,6 +78,7 @@ try
     Log.Information("LoggerService is running...");
     Log.Warning("Test warning log");
     Log.Error("Test error log");
+
     app.Run();
 }
 catch (Exception ex)

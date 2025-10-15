@@ -36,6 +36,8 @@ public static class UserActionConstants
         public const string TierValidation = "validation.tier";
         public const string ModelValidation = "validation.model";
         public const string TokenValidation = "validation.token";
+        public const string RegisteredTokenValidation = "validation.registered_token";
+        public const string LoginTokenValidation = "validation.login_token";
     }
 
     public static class System
