@@ -11,7 +11,9 @@ using Serilog.Debugging;
 using Serilog.Events;
 using Shared.Extensions;
 
-// Enable Serilog self-log for internal errors
+// ----------------------
+// Enable Serilog internal logging
+// ----------------------
 SelfLog.Enable(msg => Console.WriteLine($"SERILOG ERROR: {msg}"));
 
 try
@@ -28,9 +30,7 @@ try
     // ========================
     builder.Services.AddSingleton<ILoggerActionFactory, LoggerActionFactory>();
     builder.Services.AddSingleton<IActivityConsumer, ActivityConsumer>();
-
-    // Hosted service to consume messages
-    builder.Services.AddHostedService<UserActivityConsumerService>();
+    builder.Services.AddHostedService<UserActivityConsumerService>(); // background consumer
 
     // ========================
     // Configure Serilog
@@ -88,29 +88,52 @@ try
     var app = builder.Build();
 
     // ========================
-    // Database migration (optional but recommended)
+    // Database migration & initial check
     // ========================
     try
     {
         using var scope = app.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<LoggerDbContext>();
-        
-        Log.Information("Checking database connection...");
-        await dbContext.Database.CanConnectAsync();
-        Log.Information("✅ Database connection successful");
-        
-        // Apply migrations if needed
-        // await dbContext.Database.MigrateAsync();
+
+        var connected = false;
+        var retries = 5;
+        while (!connected && retries-- > 0)
+        {
+            try
+            {
+                Log.Information("Checking database connection...");
+                connected = await dbContext.Database.CanConnectAsync();
+                if (connected)
+                {
+                    Log.Information("✅ Database connection successful");
+                    await dbContext.Database.MigrateAsync(); // ensure schema is applied
+                }
+                else
+                {
+                    Log.Warning("Database not ready, retrying...");
+                    await Task.Delay(5000); // wait 5 sec before retry
+                }
+            }
+            catch
+            {
+                Log.Warning("Database not ready, retrying...");
+                await Task.Delay(5000);
+            }
+        }
     }
     catch (Exception ex)
     {
         Log.Warning(ex, "⚠️ Database connection failed - service will continue without database");
     }
 
-    // Middleware for Serilog request logging
+    // ========================
+    // Middleware
+    // ========================
     app.UseSerilogRequestLogging();
 
-    // Health endpoint - should respond even if database is down
+    // ========================
+    // Health endpoint
+    // ========================
     app.MapGet("/api/logger/health", async (LoggerDbContext dbContext) =>
     {
         try

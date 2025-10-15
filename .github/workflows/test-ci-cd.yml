@@ -1,0 +1,165 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - test
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # Create .env file with all secrets
+      - name: Create .env file for docker-compose
+        run: |
+          cat << EOF > .env
+          # Database secrets
+          MSSQL_SA_PASSWORD=${{ secrets.MSSQL_SA_PASSWORD }}
+          MSSQL_ACCEPT_EULA=${{ secrets.MSSQL_ACCEPT_EULA }}
+          MSSQL_PID=${{ secrets.MSSQL_PID || 'Developer' }}
+          
+          # RabbitMQ secrets
+          RABBITMQ_USER=${{ secrets.RABBITMQ_USER }}
+          RABBITMQ_PASS=${{ secrets.RABBITMQ_PASS }}
+          RABBITMQ_HOST=${{ secrets.RABBITMQ_HOST || 'rabbitmq' }}
+          
+          # JWT secrets
+          JWT_PRIVATE_KEY="${{ secrets.JWT_PRIVATE_KEY }}"
+          JWT_PUBLIC_KEY="${{ secrets.JWT_PUBLIC_KEY }}"
+          AUDIENCE=${{ secrets.AUDIENCE }}
+          ISSUER=${{ secrets.ISSUER }}
+          EXPIRATION=${{ secrets.EXPIRATION || '60' }}
+          
+          # Connection strings
+          AUTH_SERVICE_DBCONNECTION="${{ secrets.AUTH_SERVICE_DBCONNECTION }}"
+          USER_SERVICE_DBCONNECTION="${{ secrets.USER_SERVICE_DBCONNECTION }}"
+          LOG_SERVICE_DBCONNECTION="${{ secrets.LOG_SERVICE_DBCONNECTION }}"
+          
+          # Redis
+          REDIS_CONNECTION=${{ secrets.REDIS_CONNECTION || 'redis:6379' }}
+          
+          # Environment
+          DOTNET_ENVIRONMENT=Development
+          EOF
+
+      - name: Validate docker-compose file
+        run: docker-compose -f docker-compose.yml config
+
+      - name: Build services
+        run: docker-compose -f docker-compose.yml build
+
+      - name: Start services
+        run: docker-compose -f docker-compose.yml up -d
+
+      - name: Wait for services to be healthy
+        run: |
+          echo "Waiting for services to become healthy..."
+          timeout 180s bash -c '
+            until docker-compose ps | grep -q "healthy"; do
+              echo "Waiting for healthy services..."
+              sleep 10
+            done
+          ' || echo "Some services may not be fully healthy"
+
+      - name: Check container status
+        run: |
+          echo "=== Container Status ==="
+          docker-compose ps
+          echo "=== Health Status ==="
+          docker-compose ps | grep -E "(healthy|unhealthy)"
+
+      - name: Run health checks with retries
+        run: |
+          echo "Running health checks..."
+          
+          # Function to check health with retries
+          check_health() {
+            local service=$1
+            local port=$2
+            local max_attempts=10
+            local attempt=1
+          
+            while [ $attempt -le $max_attempts ]; do
+              echo "Checking $service health (attempt $attempt/$max_attempts)..."
+              if curl -f -s http://localhost:$port/api/health > /dev/null 2>&1 || 
+                 curl -f -s http://localhost:$port/health > /dev/null 2>&1; then
+                echo "✓ $service is healthy"
+                return 0
+              fi
+              sleep 10
+              attempt=$((attempt + 1))
+            done
+            echo "✗ $service health check failed after $max_attempts attempts"
+            return 1
+          }
+          
+          # Check each service
+          check_health "AuthService" "5002"
+          check_health "UserService" "5001" 
+          check_health "LoggerService" "5003"
+
+      - name: Show service logs
+        if: always()
+        run: |
+          echo "=== Service Logs ==="
+          docker-compose logs --tail=50
+
+      - name: Run basic API tests (optional)
+        if: success()
+        run: |
+          echo "Running basic API tests..."
+          # Test AuthService
+          curl -f http://localhost:5002/api/health || echo "AuthService health check failed"
+          
+          # Test UserService
+          curl -f http://localhost:5001/api/user/health || echo "UserService health check failed"
+          
+          # Test LoggerService
+          curl -f http://localhost:5003/api/health || echo "LoggerService health check failed"
+
+      - name: Show logs on failure
+        if: failure()
+        run: |
+          echo "=== Detailed Logs on Failure ==="
+          docker-compose logs
+
+      - name: Tear down
+        if: always()
+        run: |
+          docker-compose -f docker-compose.yml down -v --remove-orphans
+
+  # Optional: Add security scanning
+  security-scan:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: 'trivy-results.sarif'

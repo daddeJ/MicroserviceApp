@@ -1,0 +1,63 @@
+﻿**/.dockerignore
+**/.env
+**/.git
+**/.gitignore
+**/.project
+**/.settings
+**/.toolstarget
+**/.vs
+**/.vscode
+**/.idea
+**/*.*proj.user
+**/*.dbmdl
+**/*.jfm
+**/azds.yaml
+**/bin
+**/charts
+**/docker-compose*
+**/Dockerfile*
+**/node_modules
+**/npm-debug.log
+**/obj
+**/secrets.dev.yaml
+**/values.dev.yaml
+**/TestResults
+**/publish
+**/packages
+**/*.tmp
+**/*.log
+**/Backup
+**/.DS_Store
+**/Thumbs.db
+
+# NuGet packages
+**/*.nupkg
+**/packages/
+
+# Runtime files
+**/runtimes/
+
+# Local development files
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE files
+*.swp
+*.swo
+*~
+
+# Build outputs
+**/bld/
+**/out/
+**/dist/
+
+# Coverage reports
+**/coverage/
+**/*.coverage
+**/*.coveragexml
+
+# License and README (already included, but being explicit)
+LICENSE
+README.md
