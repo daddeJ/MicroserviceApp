@@ -1,4 +1,5 @@
 @page "/login"
+@using BlazorWasm.Constants
 @using BlazorWasm.Services
 @using BlazorWasm.Models
 @inject IAuthApiClient AuthApiClient
@@ -58,7 +59,7 @@
             return;
         }
         
-        var validateAuth = await AuthApiClient.ValidateTokenAsync(response.Data.User.UserId, response.Data.Token);
+        var validateAuth = await AuthApiClient.ValidateTokenAsync(response.Data.User.UserId, response.Data.Token, UserOperation.Login);
 
         if (!validateAuth.Success)
         {

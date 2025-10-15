@@ -27,7 +27,7 @@ public class AuthController : ControllerBase
             return BadRequest(response);
         }
 
-        var isValid = await _authService.HandleAuthTokenEventAsync(dto.UserId, dto.Token);
+        var isValid = await _authService.HandleAuthTokenEventAsync(dto.UserId, dto.Token, dto.Operation);
 
         if (isValid.Success)
         {

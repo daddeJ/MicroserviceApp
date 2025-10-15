@@ -1,4 +1,5 @@
 @page "/register"
+@using BlazorWasm.Constants
 @using BlazorWasm.Models
 @using BlazorWasm.Services
 @inject IUserApiClient UserApiClient
@@ -71,7 +72,7 @@
             return;
         }
         
-        var validateAuth = await AuthApiClient.ValidateTokenAsync(response.Data.User.UserId, response.Data.Token);
+        var validateAuth = await AuthApiClient.ValidateTokenAsync(response.Data.User.UserId, response.Data.Token, UserOperation.Register);
 
         if (!validateAuth.Success)
         {

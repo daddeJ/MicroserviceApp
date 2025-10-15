@@ -3,6 +3,7 @@ namespace LoggerService.Data.Entities;
 public class ApplicationLog
 {
     public int Id { get; set; }
+    public Guid ApplicationLogId { get; set; } = Guid.NewGuid();
     public string Message { get; set; }
     public string MessageTemplate { get; set; }
     public string Level { get; set; }

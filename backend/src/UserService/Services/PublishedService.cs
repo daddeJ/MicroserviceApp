@@ -36,11 +36,19 @@ public class PublishedService : IPublisherService
     
     public async Task PublishTokenAndActivityEvents(Guid userId, string userAction)
     {
+        string metadata = userAction switch
+        {
+            QueueNames.UserActionLogin => QueueNames.UserActionLogin,
+            QueueNames.UserActionRegister => QueueNames.UserActionRegister,
+            _ => "Error"
+        };
+        
         var authActivity = new AuthActivityEvent()
         {
             UserId = userId,
             Action = "generate_token",
-            Timestamp = DateTime.UtcNow
+            Timestamp = DateTime.UtcNow,
+            Metadata = metadata
         };
         await _messagePublisher.PublishAsync(QueueNames.GenerateTokenActivity, authActivity);
 
@@ -48,7 +56,8 @@ public class PublishedService : IPublisherService
         {
             UserId = userId,
             Action = userAction,
-            Timestamp = DateTime.UtcNow
+            Timestamp = DateTime.UtcNow,
+            Metadata = metadata
         };
         await _messagePublisher.PublishAsync(QueueNames.UserActivity, userActivity);
     }

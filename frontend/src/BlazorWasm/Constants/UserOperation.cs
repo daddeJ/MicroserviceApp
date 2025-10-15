@@ -1,6 +1,7 @@
 namespace BlazorWasm.Constants;
 
-public class UserOperation
+public static class UserOperation
 {
-    
+    public const string Login = "login";
+    public const string Register = "register";
 }

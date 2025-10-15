@@ -29,7 +29,7 @@ namespace AuthService.Services
             _userActionFactory = userActionFactory;
         }
         
-        public async Task<(bool Success, string[] Errors)> HandleAuthTokenEventAsync(Guid userId, string token)
+        public async Task<(bool Success, string[] Errors)> HandleAuthTokenEventAsync(Guid userId, string token, string op)
         {
             var errors = new List<string>();
 
@@ -42,7 +42,20 @@ namespace AuthService.Services
             if (errors.Count > 0)
                 return (false, errors.ToArray());
 
-            var storedToken = await _redisCache.GetStringAsync($"user:{userId}:token");
+            string _op = op switch
+            {
+                QueueNames.UserActionLogin => UserActionConstants.Validation.LoginTokenValidation,
+                QueueNames.UserActionRegister => UserActionConstants.Validation.RegisteredTokenValidation,
+                _ => "Error"
+            };
+
+            if (_op.Equals("Error", StringComparison.OrdinalIgnoreCase))
+            {
+                errors.Add("Invalid operation type.");
+                return (false, errors.ToArray());
+            }
+            
+            var storedToken = await _redisCache.GetStringAsync($"user:{userId}:{_op}");
 
             var isValid = storedToken != null && storedToken == token;
             var action = isValid ? "user_validated" : "token_validation_failed";
@@ -62,7 +75,7 @@ namespace AuthService.Services
             return (isValid, errors.ToArray());
         }
         
-        public async Task HandleUserAuthenticationTokenAsync(Guid userId)
+        public async Task HandleUserAuthenticationTokenAsync(Guid userId, string op)
         {
             var redisKey = $"user:{userId}:temp";
             var userDto = await _redisCache.GetAsync<UserDto>(redisKey);
@@ -84,7 +97,19 @@ namespace AuthService.Services
             
             var token = _generator.GenerateToken(claims);
             
-            await _redisCache.SetStringAsync($"user:{userId}:token", token, TimeSpan.FromHours(1));
+            string _op = op switch
+            {
+                QueueNames.UserActionLogin => UserActionConstants.Validation.LoginTokenValidation,
+                QueueNames.UserActionRegister => UserActionConstants.Validation.RegisteredTokenValidation,
+                _ => "Error"
+            };
+
+            if (_op.Equals("Error", StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+            
+            await _redisCache.SetStringAsync($"user:{userId}:{_op}", token, TimeSpan.FromHours(1));
             
             await PublishTokenAndActivityEvents(
                 userId,

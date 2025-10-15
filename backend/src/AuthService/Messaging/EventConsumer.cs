@@ -44,7 +44,7 @@ public class EventConsumer
                 var userEvent = JsonSerializer.Deserialize<UserActivityEvent>(message);
                 if (userEvent != null)
                 {
-                    await _authService.HandleUserAuthenticationTokenAsync(userEvent.UserId);
+                    await _authService.HandleUserAuthenticationTokenAsync(userEvent.UserId, userEvent.Metadata);
                 }
 
                 channel.BasicAckAsync(ea.DeliveryTag, false);
