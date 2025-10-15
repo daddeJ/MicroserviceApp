@@ -66,7 +66,19 @@ namespace AuthService.Services
                 Action = action,
                 Timestamp = DateTime.UtcNow
             };
+            
+            var meta = _userActionFactory.GetMetadata(UserActionConstants.Validation.LoginTokenValidation);
 
+            var logEvent = new UserActivityEvent(
+                userId: userId,
+                action: meta.Action,
+                category: meta.Category,
+                description: meta.Description,
+                defaultLogLevel: meta.DefaultLogLevel,
+                timestamp: DateTime.UtcNow,
+                metadata: null);
+        
+            await _messagePublisher.PublishAsync(QueueNames.LoggerActivity, logEvent);
             await _messagePublisher.PublishAsync(QueueNames.AuthActivity, authActivity);
 
             if (!isValid)
