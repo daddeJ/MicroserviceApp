@@ -2,54 +2,96 @@ using AuthService.Data;
 using AuthService.Messaging;
 using AuthService.Services;
 using Microsoft.EntityFrameworkCore;
+using Serilog;
 using Shared.Extensions;
 using Shared.Helpers;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddCors(options =>
-{
-    options.AddDefaultPolicy(policy =>
-    {
-        policy
-            .WithOrigins("http://localhost:5004")
-            .AllowAnyHeader()
-            .AllowAnyMethod();
-    });
-});
-
+// ========================
+// Add configuration and shared infrastructure
+// ========================
 builder.Configuration.AddUserSecrets<Program>();
-
 builder.Services.AddSharedInfrastructure(builder.Configuration);
 
+// ========================
+// Register DI services
+// ========================
 builder.Services.AddSingleton<IEventPublisher, EventPublisher>();
 builder.Services.AddSingleton<IAuthService, AuthServiceImp>();
 
+// Event consumer
 builder.Services.AddSingleton<EventConsumer>();
 
+// ========================
+// Configure DbContext
+// ========================
 builder.Services.AddDbContext<AuthDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("AuthServiceConnection")));
 
+// ========================
+// Add Controllers & Swagger
+// ========================
 builder.Services.AddControllers();
-
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+// ========================
+// Build app
+// ========================
 var app = builder.Build();
 
+// ========================
+// Swagger for development
+// ========================
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
 
+// ========================
+// Middleware
+// ========================
 app.UseRouting();
-app.UseCors();
 app.UseAuthorization();
 app.MapControllers();
 
+// ========================
+// Health check endpoint
+// ========================
+app.MapGet("/api/auth/health", async (AuthDbContext dbContext) =>
+{
+    try
+    {
+        var canConnect = await dbContext.Database.CanConnectAsync();
+        return Results.Ok(new
+        {
+            status = canConnect ? "Healthy" : "Degraded",
+            timestamp = DateTime.UtcNow,
+            database = canConnect ? "Connected" : "Disconnected"
+        });
+    }
+    catch (Exception ex)
+    {
+        Log.Warning(ex, "Health check database connection failed");
+        return Results.Ok(new
+        {
+            status = "Degraded",
+            timestamp = DateTime.UtcNow,
+            database = "Error",
+            error = ex.Message
+        });
+    }
+});
+
+// ========================
+// Start message consumer
+// ========================
 var consumer = app.Services.GetRequiredService<EventConsumer>();
 consumer.StartConsuming();
 
+// ========================
+// Run the app
+// ========================
 app.Run();
-

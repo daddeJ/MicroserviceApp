@@ -1,4 +1,3 @@
-using System.Collections.ObjectModel;
 using System.Data;
 using LoggerService.Consumers;
 using LoggerService.Data;
@@ -10,9 +9,9 @@ using Microsoft.EntityFrameworkCore;
 using Serilog;
 using Serilog.Debugging;
 using Serilog.Events;
-using Serilog.Sinks.MSSqlServer;
 using Shared.Extensions;
 
+// Enable Serilog self-log for internal errors
 SelfLog.Enable(msg => Console.WriteLine($"SERILOG ERROR: {msg}"));
 
 try
@@ -30,7 +29,7 @@ try
     builder.Services.AddSingleton<ILoggerActionFactory, LoggerActionFactory>();
     builder.Services.AddSingleton<IActivityConsumer, ActivityConsumer>();
 
-    // HostedService
+    // Hosted service to consume messages
     builder.Services.AddHostedService<UserActivityConsumerService>();
 
     // ========================
@@ -39,7 +38,7 @@ try
     builder.Host.UseSerilog((context, services, configuration) =>
     {
         var connectionString = context.Configuration.GetConnectionString("LoggerServiceConnection");
-        
+
         configuration
             .ReadFrom.Configuration(context.Configuration)
             .Enrich.FromLogContext()
@@ -55,7 +54,15 @@ try
 
         if (!string.IsNullOrEmpty(connectionString))
         {
-            configuration.AddCustomSqlLogger(connectionString);
+            try
+            {
+                configuration.AddCustomSqlLogger(connectionString);
+                Console.WriteLine("✅ SQL Logger configured successfully");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"⚠️ Failed to configure SQL Logger: {ex.Message}");
+            }
         }
         else
         {
@@ -66,26 +73,81 @@ try
     Log.Information("=== Starting Logger Service ===");
 
     // ========================
-    // Add DbContext
+    // Add DbContext with retry logic
     // ========================
     builder.Services.AddDbContext<LoggerDbContext>(options =>
-        options.UseSqlServer(builder.Configuration.GetConnectionString("LoggerServiceConnection")));
+        options.UseSqlServer(
+            builder.Configuration.GetConnectionString("LoggerServiceConnection"),
+            sqlOptions => sqlOptions.EnableRetryOnFailure(
+                maxRetryCount: 5,
+                maxRetryDelay: TimeSpan.FromSeconds(30),
+                errorNumbersToAdd: null
+            )
+        ));
 
     var app = builder.Build();
 
+    // ========================
+    // Database migration (optional but recommended)
+    // ========================
+    try
+    {
+        using var scope = app.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<LoggerDbContext>();
+        
+        Log.Information("Checking database connection...");
+        await dbContext.Database.CanConnectAsync();
+        Log.Information("✅ Database connection successful");
+        
+        // Apply migrations if needed
+        // await dbContext.Database.MigrateAsync();
+    }
+    catch (Exception ex)
+    {
+        Log.Warning(ex, "⚠️ Database connection failed - service will continue without database");
+    }
+
+    // Middleware for Serilog request logging
     app.UseSerilogRequestLogging();
+
+    // Health endpoint - should respond even if database is down
+    app.MapGet("/api/logger/health", async (LoggerDbContext dbContext) =>
+    {
+        try
+        {
+            var canConnect = await dbContext.Database.CanConnectAsync();
+            return Results.Ok(new
+            {
+                status = canConnect ? "Healthy" : "Degraded",
+                timestamp = DateTime.UtcNow,
+                database = canConnect ? "Connected" : "Disconnected"
+            });
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Health check database connection failed");
+            return Results.Ok(new
+            {
+                status = "Degraded",
+                timestamp = DateTime.UtcNow,
+                database = "Error",
+                error = ex.Message
+            });
+        }
+    });
 
     Log.Information("LoggerService is running...");
     Log.Warning("Test warning log");
     Log.Error("Test error log");
 
-    app.Run();
+    await app.RunAsync();
 }
 catch (Exception ex)
 {
     Log.Fatal(ex, "LoggerService failed to start");
+    throw;
 }
 finally
 {
-    Log.CloseAndFlush();
+    await Log.CloseAndFlushAsync();
 }
