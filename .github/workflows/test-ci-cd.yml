@@ -32,28 +32,34 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # 🧩 STEP 4: Build all services with Docker Compose
+      # 🧩 STEP 4: Build all images with Docker Compose
       - name: Build all images
         run: |
-          echo "🔨 Building Docker images using docker-compose..."
+          echo "🔨 Building Docker images using docker compose..."
           docker compose -f $COMPOSE_FILE build --no-cache
 
       # 🧩 STEP 5: Tag and push images to DockerHub
-      - name: Push Docker images to DockerHub
+        # Each service must match the service name in docker-compose.yml
+      - name: Tag and push images to DockerHub
         run: |
-          echo "🚀 Pushing built images to DockerHub..."
-          docker images
+          echo "🚀 Tagging and pushing images to DockerHub..."
 
-          # Define image names (same as docker-compose service names)
-          services=(authservice userservice loggerservice nginx-gateway)
+          # Define image mappings: service_name=image_name_in_compose
+          declare -A images=(
+            [authservice]="${{ secrets.DOCKERHUB_USERNAME }}/authservice"
+            [userservice]="${{ secrets.DOCKERHUB_USERNAME }}/userservice"
+            [loggerservice]="${{ secrets.DOCKERHUB_USERNAME }}/loggerservice"
+            [nginx]="${{ secrets.DOCKERHUB_USERNAME }}/nginx-gateway"
+          )
 
-          for service in "${services[@]}"; do
-            echo "Tagging and pushing $service..."
-            docker tag "$service" ${{ secrets.DOCKERHUB_USERNAME }}/$service:$IMAGE_TAG
-            docker push ${{ secrets.DOCKERHUB_USERNAME }}/$service:$IMAGE_TAG
+          # Tag and push each image
+          for service in "${!images[@]}"; do
+            echo "Pushing image for $service..."
+            docker tag "$service" "${images[$service]}:$IMAGE_TAG"
+            docker push "${images[$service]}:$IMAGE_TAG"
           done
 
-          echo "✅ All images pushed successfully."
+          echo "✅ All Docker images successfully pushed to DockerHub."
 
       # 🧩 STEP 6: Upload docker-compose.yml as artifact (optional)
       - name: Upload docker-compose.yml
