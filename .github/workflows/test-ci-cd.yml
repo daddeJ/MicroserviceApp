@@ -1,4 +1,4 @@
-name: CI/CD Pipeline
+name: CI - Build and Push Docker Images
 
 on:
   push:
@@ -9,13 +9,13 @@ on:
       - test
 
 jobs:
-  build-and-test:
+  build-and-push:
     runs-on: ubuntu-latest
 
     env:
+      DOCKER_BUILDKIT: 1
       COMPOSE_FILE: docker-compose.yml
-      DOTNET_ENVIRONMENT: Development
-      SQL_MOUNT_PATH: /tmp/sql
+      IMAGE_TAG: latest
 
     steps:
       - name: Checkout code
@@ -30,128 +30,34 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # 🧩 STEP 1: Securely recreate your PEM keys from GitHub Secrets
-      - name: Write JWT keys to files
+      # 🔹 Build and push AuthService
+      - name: Build and push AuthService image
         run: |
-          mkdir -p backend/keys
-          echo "${{ secrets.JWT_PRIVATE_KEY }}" > backend/keys/jwt_private.pem
-          echo "${{ secrets.JWT_PUBLIC_KEY }}" > backend/keys/jwt_public.pem
-          echo "✅ JWT PEM files created in backend/keys"
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/authservice:$IMAGE_TAG -f backend/src/AuthService/Dockerfile .
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/authservice:$IMAGE_TAG
 
-      # 🧩 STEP 2: Create .env file (same as local setup)
-      - name: Create .env file for docker compose
+      # 🔹 Build and push UserService
+      - name: Build and push UserService image
         run: |
-          cat << EOF > .env
-          # Database
-          MSSQL_SA_PASSWORD=${{ secrets.MSSQL_SA_PASSWORD }}
-          MSSQL_ACCEPT_EULA=${{ secrets.MSSQL_ACCEPT_EULA }}
-          MSSQL_PID=${{ secrets.MSSQL_PID || 'Developer' }}
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/userservice:$IMAGE_TAG -f backend/src/UserService/Dockerfile .
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/userservice:$IMAGE_TAG
 
-          # RabbitMQ
-          RABBITMQ_USER=${{ secrets.RABBITMQ_USER }}
-          RABBITMQ_PASS=${{ secrets.RABBITMQ_PASS }}
-          RABBITMQ_HOST=${{ secrets.RABBITMQ_HOST || 'rabbitmq' }}
-
-          # JWT
-          JWT_PRIVATE_KEY_PATH=/app/keys/jwt_private.pem
-          JWT_PUBLIC_KEY_PATH=/app/keys/jwt_public.pem
-          AUDIENCE=${{ secrets.AUDIENCE }}
-          ISSUER=${{ secrets.ISSUER }}
-          EXPIRATION=${{ secrets.EXPIRATION || '60' }}
-
-          # Connection strings
-          AUTH_SERVICE_DBCONNECTION=${{ secrets.AUTH_SERVICE_DBCONNECTION }}
-          USER_SERVICE_DBCONNECTION=${{ secrets.USER_SERVICE_DBCONNECTION }}
-          LOG_SERVICE_DBCONNECTION=${{ secrets.LOG_SERVICE_DBCONNECTION }}
-
-          # Redis
-          REDIS_CONNECTION=${{ secrets.REDIS_CONNECTION || 'redis:6379' }}
-          EOF
-
-      # 🧩 STEP 3: Generate SSL certificates for Nginx
-      - name: Generate SSL certificates
+      # 🔹 Build and push LoggerService
+      - name: Build and push LoggerService image
         run: |
-          mkdir -p nginx/certs
-          openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-            -keyout nginx/certs/server.key \
-            -out nginx/certs/server.crt \
-            -subj "/C=US/ST=State/L=City/O=Organization/CN=localhost" 2>/dev/null
-          echo "✅ SSL certificates generated"
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/loggerservice:$IMAGE_TAG -f backend/src/LoggerService/Dockerfile .
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/loggerservice:$IMAGE_TAG
 
-      # 🧩 STEP 4: Validate docker compose file
-      - name: Validate docker compose file
-        run: docker compose -f $COMPOSE_FILE config
-
-      # 🧩 STEP 5: Build all services
-      - name: Build services
-        run: docker compose -f $COMPOSE_FILE build --no-cache
-
-      # 🧩 STEP 6: Start core infra (DB, cache, queue)
-      - name: Start infrastructure services
-        run: docker compose -f $COMPOSE_FILE up -d mssql redis rabbitmq
-
-      # 🧩 STEP 7: Wait for infra to be healthy
-      - name: Wait for infrastructure health
+      # 🔹 Build and push Nginx (optional, if using custom config)
+      - name: Build and push Nginx image
         run: |
-          echo "Waiting for MSSQL, Redis, and RabbitMQ to be healthy..."
-          timeout 400s bash -c '
-          while :; do
-            healthy_count=0
-            for service in mssql redis rabbitmq; do
-              id=$(docker compose -f $COMPOSE_FILE ps -q $service)
-              health=$(docker inspect "$id" --format="{{if .State.Health}}{{.State.Health.Status}}{{else}}running{{end}}" 2>/dev/null)
-              [ "$health" = "healthy" ] && healthy_count=$((healthy_count+1))
-            done
-            [ $healthy_count -eq 3 ] && break
-            echo "Waiting for infra..."
-            sleep 10
-          done
-          '
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/nginx-gateway:$IMAGE_TAG -f nginx/Dockerfile .
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/nginx-gateway:$IMAGE_TAG
 
-      # 🧩 STEP 8: Initialize databases (match setup-unified.sh)
-      - name: Initialize databases
+      - name: Verify pushed images
         run: |
-          echo "Initializing SQL..."
-          docker compose -f $COMPOSE_FILE exec -T mssql \
-            /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$MSSQL_SA_PASSWORD" \
-            -i "$SQL_MOUNT_PATH/init-database.sql" -C
-
-      # 🧩 STEP 9: Start all app services (auth, user, logger, nginx)
-      - name: Start application services
-        run: docker compose -f $COMPOSE_FILE up -d authservice userservice loggerservice nginx
-
-      # 🧩 STEP 10: Wait for app health
-      - name: Wait for application health
-        run: |
-          echo "Waiting for application services..."
-          timeout 180s bash -c '
-          services=(authservice userservice loggerservice nginx)
-          while :; do
-            healthy_count=0
-            for s in "${services[@]}"; do
-              id=$(docker compose -f $COMPOSE_FILE ps -q $s)
-              health=$(docker inspect "$id" --format="{{if .State.Health}}{{.State.Health.Status}}{{else}}running{{end}}" 2>/dev/null)
-              [ "$health" = "healthy" ] && healthy_count=$((healthy_count+1))
-            done
-            [ $healthy_count -eq 4 ] && break
-            echo "Waiting for app services..."
-            sleep 5
-          done
-          '
-
-      # 🧩 STEP 11: Health checks (same as local unified script)
-      - name: Run health checks
-        run: |
-          echo "Running health checks..."
-          set -e
-          services=(authservice:5002:/api/auth/health userservice:5001:/api/user/health loggerservice:5003:/api/logger/health nginx:80:/)
-          for s in "${services[@]}"; do
-            IFS=: read name port path <<< "$s"
-            echo "Checking $name..."
-            curl -f -s -m 5 "http://localhost:$port$path" || echo "$name healthcheck failed"
-          done
-
-      # 🧩 STEP 12: Cleanup temporary PEMs
-      - name: Cleanup PEM files
-        if: always()
-        run: rm -rf backend/keys
+          echo "✅ Successfully pushed images:"
+          echo "${{ secrets.DOCKERHUB_USERNAME }}/authservice:$IMAGE_TAG"
+          echo "${{ secrets.DOCKERHUB_USERNAME }}/userservice:$IMAGE_TAG"
+          echo "${{ secrets.DOCKERHUB_USERNAME }}/loggerservice:$IMAGE_TAG"
+          echo "${{ secrets.DOCKERHUB_USERNAME }}/nginx-gateway:$IMAGE_TAG"
