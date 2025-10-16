@@ -1,3 +1,4 @@
+using System.IO;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Shared.Caching;
@@ -26,20 +27,29 @@ public static class ServiceCollectionExtensions
                        ?? throw new InvalidOperationException("Audience not found in JWT");
         var issuer = configuration["JwtSettings:Issuer"]
                      ?? throw new InvalidOperationException("Issuer not found in JWT");
-        var privateKey = configuration["JwtSettings:PrivateKey"]
-                         ?? throw new InvalidOperationException("Private key not found in JWT");
-        var publicKey = configuration["JwtSettings:PublicKey"]
-                        ?? throw new InvalidOperationException("Public key not found in JWT");
+        var privateKeyPath = configuration["JwtSettings:PrivateKeyPath"]
+                             ?? throw new InvalidOperationException("Private key path not found in JWT");
+        var publicKeyPath = configuration["JwtSettings:PublicKeyPath"]
+                            ?? throw new InvalidOperationException("Public key path not found in JWT");
         var expirationMinutes = int.Parse(configuration["JwtSettings:ExpirationMinutes"]
                                           ?? throw new InvalidOperationException("Expiration minutes not found in JWT"));
 
+        // Read key contents from file
+        if (!File.Exists(privateKeyPath))
+            throw new FileNotFoundException($"Private key file not found at {privateKeyPath}");
+        if (!File.Exists(publicKeyPath))
+            throw new FileNotFoundException($"Public key file not found at {publicKeyPath}");
+
+        var privateKey = File.ReadAllText(privateKeyPath);
+        var publicKey = File.ReadAllText(publicKeyPath);
+
         var jwtOptions = new JwtOptions
         {
-            Audience = configuration["JwtSettings:Audience"]!,
-            Issuer = configuration["JwtSettings:Issuer"]!,
-            PrivateKey = configuration["JwtSettings:PrivateKey"]!,
-            PublicKey = configuration["JwtSettings:PublicKey"]!,
-            ExpirationMinutes = int.Parse(configuration["JwtSettings:ExpirationMinutes"]!)
+            Audience = audience,
+            Issuer = issuer,
+            PrivateKey = privateKey,
+            PublicKey = publicKey,
+            ExpirationMinutes = expirationMinutes
         };
 
         services.AddSingleton(jwtOptions);
@@ -55,6 +65,7 @@ public static class ServiceCollectionExtensions
             var options = sp.GetRequiredService<JwtOptions>();
             return new TokenValidator(options);
         });
+
         return services;
     }
 
