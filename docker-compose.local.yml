@@ -73,16 +73,16 @@ services:
       RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
       RABBITMQ_USER: ${RABBITMQ_USER:-guest}
       RABBITMQ_PASS: ${RABBITMQ_PASS:-guest}
-      JwtSettings__PrivateKey: ${JWT_PRIVATE_KEY}
-      JwtSettings__PublicKey: ${JWT_PUBLIC_KEY}
+      JwtSettings__PrivateKeyPath: ${JWT_PRIVATE_KEY_PATH}
+      JwtSettings__PublicKeyPath: ${JWT_PUBLIC_KEY_PATH}
       JwtSettings__Audience: ${AUDIENCE}
       JwtSettings__Issuer: ${ISSUER}
       JwtSettings__ExpirationMinutes: ${EXPIRATION:-60}
-      ConnectionStrings__AuthServiceConnection: ${AUTH_SERVICE_DBCONNECTION_LOCAL}
+      ConnectionStrings__AuthServiceConnection: ${AUTH_SERVICE_DBCONNECTION}
     volumes:
-      - ./backend/keys:/app/keys:ro  # Mount JWT keys
+      - ./backend/keys:/app/keys:ro
     healthcheck:
-      test: ["CMD-SHELL", "timeout 1 bash -c '</dev/tcp/localhost/8080' 2>/dev/null || exit 1"]
+      test: [ "CMD-SHELL", "timeout 1 bash -c '</dev/tcp/localhost/8080' 2>/dev/null || exit 1" ]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -112,13 +112,13 @@ services:
       RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
       RABBITMQ_USER: ${RABBITMQ_USER:-guest}
       RABBITMQ_PASS: ${RABBITMQ_PASS:-guest}
-      JwtSettings__PrivateKey: ${JWT_PRIVATE_KEY}
-      JwtSettings__PublicKey: ${JWT_PUBLIC_KEY}
-      ConnectionStrings__UserServiceConnection: ${USER_SERVICE_DBCONNECTION_LOCAL}
+      JwtSettings__PrivateKeyPath: ${JWT_PRIVATE_KEY_PATH}
+      JwtSettings__PublicKeyPath: ${JWT_PUBLIC_KEY_PATH}
+      ConnectionStrings__UserServiceConnection: ${USER_SERVICE_DBCONNECTION}
     volumes:
-      - ./backend/keys:/app/keys:ro  # Mount JWT keys
+      - ./backend/keys:/app/keys:ro
     healthcheck:
-      test: ["CMD-SHELL", "timeout 1 bash -c '</dev/tcp/localhost/8080' 2>/dev/null || exit 1"]
+      test: [ "CMD-SHELL", "timeout 1 bash -c '</dev/tcp/localhost/8080' 2>/dev/null || exit 1" ]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -145,7 +145,7 @@ services:
       RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
       RABBITMQ_USER: ${RABBITMQ_USER:-guest}
       RABBITMQ_PASS: ${RABBITMQ_PASS:-guest}
-      ConnectionStrings__LoggerServiceConnection: ${LOG_SERVICE_DBCONNECTION_LOCAL}
+      ConnectionStrings__LoggerServiceConnection: ${LOG_SERVICE_DBCONNECTION}
     healthcheck:
       test: ["CMD-SHELL", "timeout 1 bash -c '</dev/tcp/localhost/8080' 2>/dev/null || exit 1"]
       interval: 10s
