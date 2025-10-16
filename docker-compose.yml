@@ -5,17 +5,18 @@ services:
     ports:
       - "1433:1433"
     environment:
-      SA_PASSWORD: ${MSSQL_SA_PASSWORD:-StrongP@ssword123!}
+      SA_PASSWORD: ${MSSQL_SA_PASSWORD:-StrongP@ssw0rd123!}
       ACCEPT_EULA: ${MSSQL_ACCEPT_EULA:-Y}
       MSSQL_PID: ${MSSQL_PID:-Developer}
     healthcheck:
-      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P ${MSSQL_SA_PASSWORD:-StrongP@ssword123!} -Q 'SELECT 1' -C || exit 1"]
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P ${MSSQL_SA_PASSWORD_LOCAL:-StrongP@ssw0rd123!} -Q 'SELECT 1' -C || exit 1"]
       interval: 15s
       timeout: 10s
       retries: 10
       start_period: 60s
     volumes:
       - mssql_data:/var/opt/mssql
+      - ./scripts/sql:/tmp/sql:ro  # Mount to a different directory
     networks:
       - microservice_network
 
@@ -72,14 +73,16 @@ services:
       RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
       RABBITMQ_USER: ${RABBITMQ_USER:-guest}
       RABBITMQ_PASS: ${RABBITMQ_PASS:-guest}
-      JwtSettings__PrivateKey: ${JWT_PRIVATE_KEY}
-      JwtSettings__PublicKey: ${JWT_PUBLIC_KEY}
+      JwtSettings__PrivateKeyPath: ${JWT_PRIVATE_KEY_PATH}
+      JwtSettings__PublicKeyPath: ${JWT_PUBLIC_KEY_PATH}
       JwtSettings__Audience: ${AUDIENCE}
       JwtSettings__Issuer: ${ISSUER}
       JwtSettings__ExpirationMinutes: ${EXPIRATION:-60}
       ConnectionStrings__AuthServiceConnection: ${AUTH_SERVICE_DBCONNECTION}
+    volumes:
+      - ./backend/keys:/app/keys:ro
     healthcheck:
-      test: ["CMD-SHELL", "timeout 1 bash -c '</dev/tcp/localhost/8080' 2>/dev/null || exit 1"]
+      test: [ "CMD-SHELL", "timeout 1 bash -c '</dev/tcp/localhost/8080' 2>/dev/null || exit 1" ]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -109,11 +112,13 @@ services:
       RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
       RABBITMQ_USER: ${RABBITMQ_USER:-guest}
       RABBITMQ_PASS: ${RABBITMQ_PASS:-guest}
-      JwtSettings__PrivateKey: ${JWT_PRIVATE_KEY}
-      JwtSettings__PublicKey: ${JWT_PUBLIC_KEY}
+      JwtSettings__PrivateKeyPath: ${JWT_PRIVATE_KEY_PATH}
+      JwtSettings__PublicKeyPath: ${JWT_PUBLIC_KEY_PATH}
       ConnectionStrings__UserServiceConnection: ${USER_SERVICE_DBCONNECTION}
+    volumes:
+      - ./backend/keys:/app/keys:ro
     healthcheck:
-      test: ["CMD-SHELL", "timeout 1 bash -c '</dev/tcp/localhost/8080' 2>/dev/null || exit 1"]
+      test: [ "CMD-SHELL", "timeout 1 bash -c '</dev/tcp/localhost/8080' 2>/dev/null || exit 1" ]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -152,7 +157,9 @@ services:
       - microservice_network
   
   nginx:
-    build: ./nginx
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
     container_name: nginx
     ports:
       - "80:80"
@@ -168,11 +175,11 @@ services:
       - ./nginx/certs:/etc/nginx/certs:ro
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     healthcheck:
-      test: ["CMD-SHELL", "timeout 1 bash -c '</dev/tcp/localhost/80' 2>/dev/null || exit 1"]
-      interval: 10s
-      timeout: 5s
+      test: [ "CMD-SHELL", "curl -f http://localhost/health || exit 1" ]
+      interval: 15s
+      timeout: 10s
       retries: 3
-      start_period: 10s
+      start_period: 30s
     restart: unless-stopped
     networks:
       - microservice_network

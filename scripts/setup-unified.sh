@@ -7,7 +7,7 @@ set -euo pipefail
 # ============================================================================
 
 # Configuration
-COMPOSE_FILE="docker-compose.local.yml"
+COMPOSE_FILE="docker-compose.yml"
 SQL_MOUNT_PATH="/tmp/sql"
 LOG_FILE="setup_$(date +%Y%m%d_%H%M%S).log"
 VERBOSE=${VERBOSE:-false}
@@ -208,16 +208,16 @@ load_environment() {
     echo ""
     echo "🔧 Loading environment configuration..."
     
-    if [ -f .env.local ]; then
-        log_info "Loading .env.local..."
+    if [ -f .env ]; then
+        log_info "Loading .env..."
         while IFS= read -r line; do
             [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
             if [[ "$line" =~ ^[a-zA-Z_][a-zA-Z0-9_]*= ]]; then
                 export "$line" 2>/dev/null || log_warn "Could not export: ${line%%=*}"
             fi
-        done < .env.local
+        done < .env
     else
-        log_warn "No .env.local found, using defaults"
+        log_warn "No .env found, using defaults"
     fi
     
     # Set defaults
@@ -249,57 +249,57 @@ load_environment() {
     
     local has_errors=0
     
-    # Check AUTH_SERVICE_DBCONNECTION_LOCAL
-    if [ -n "$AUTH_SERVICE_DBCONNECTION_LOCAL" ]; then
-        if [[ "$AUTH_SERVICE_DBCONNECTION_LOCAL" =~ ^[\'\"] ]]; then
-            log_error "AUTH_SERVICE_DBCONNECTION_LOCAL starts with quotes - remove them from .env.local"
-            echo "   Current: ${AUTH_SERVICE_DBCONNECTION_LOCAL:0:50}..."
-            echo "   Should be: AUTH_SERVICE_DBCONNECTION_LOCAL=Server=mssql;Database=..."
-            echo "   NOT: AUTH_SERVICE_DBCONNECTION_LOCAL='Server=mssql;Database=...'"
+    # Check AUTH_SERVICE_DBCONNECTION
+    if [ -n "$AUTH_SERVICE_DBCONNECTION" ]; then
+        if [[ "$AUTH_SERVICE_DBCONNECTION" =~ ^[\'\"] ]]; then
+            log_error "AUTH_SERVICE_DBCONNECTION starts with quotes - remove them from .env"
+            echo "   Current: ${AUTH_SERVICE_DBCONNECTION:0:50}..."
+            echo "   Should be: AUTH_SERVICE_DBCONNECTION=Server=mssql;Database=..."
+            echo "   NOT: AUTH_SERVICE_DBCONNECTION='Server=mssql;Database=...'"
             has_errors=1
         else
-            echo "   ✓ AUTH_SERVICE_DBCONNECTION_LOCAL format looks valid"
+            echo "   ✓ AUTH_SERVICE_DBCONNECTION format looks valid"
         fi
     else
-        log_warn "AUTH_SERVICE_DBCONNECTION_LOCAL not set"
+        log_warn "AUTH_SERVICE_DBCONNECTION not set"
     fi
     
-    # Check USER_SERVICE_DBCONNECTION_LOCAL
-    if [ -n "$USER_SERVICE_DBCONNECTION_LOCAL" ]; then
-        if [[ "$USER_SERVICE_DBCONNECTION_LOCAL" =~ ^[\'\"] ]]; then
-            log_error "USER_SERVICE_DBCONNECTION_LOCAL starts with quotes - remove them from .env.local"
+    # Check USER_SERVICE_DBCONNECTION
+    if [ -n "$USER_SERVICE_DBCONNECTION" ]; then
+        if [[ "$USER_SERVICE_DBCONNECTION" =~ ^[\'\"] ]]; then
+            log_error "USER_SERVICE_DBCONNECTION starts with quotes - remove them from .env"
             has_errors=1
         else
-            echo "   ✓ USER_SERVICE_DBCONNECTION_LOCAL format looks valid"
+            echo "   ✓ USER_SERVICE_DBCONNECTION format looks valid"
         fi
     else
-        log_warn "USER_SERVICE_DBCONNECTION_LOCAL not set"
+        log_warn "USER_SERVICE_DBCONNECTION not set"
     fi
     
-    # Check LOG_SERVICE_DBCONNECTION_LOCAL
-    if [ -n "$LOG_SERVICE_DBCONNECTION_LOCAL" ]; then
-        if [[ "$LOG_SERVICE_DBCONNECTION_LOCAL" =~ ^[\'\"] ]]; then
-            log_error "LOG_SERVICE_DBCONNECTION_LOCAL starts with quotes - remove them from .env.local"
+    # Check LOG_SERVICE_DBCONNECTION
+    if [ -n "$LOG_SERVICE_DBCONNECTION" ]; then
+        if [[ "$LOG_SERVICE_DBCONNECTION" =~ ^[\'\"] ]]; then
+            log_error "LOG_SERVICE_DBCONNECTION starts with quotes - remove them from .env"
             has_errors=1
         else
-            echo "   ✓ LOG_SERVICE_DBCONNECTION_LOCAL format looks valid"
+            echo "   ✓ LOG_SERVICE_DBCONNECTION format looks valid"
         fi
     else
-        log_warn "LOG_SERVICE_DBCONNECTION_LOCAL not set"
+        log_warn "LOG_SERVICE_DBCONNECTION not set"
     fi
     
     if [ $has_errors -eq 1 ]; then
         echo ""
         log_error "Connection string validation failed"
         echo ""
-        echo "📝 How to fix your .env.local file:"
+        echo "📝 How to fix your .env file:"
         echo "   Remove single or double quotes around connection strings"
         echo ""
         echo "   ❌ WRONG:"
-        echo "   AUTH_SERVICE_DBCONNECTION_LOCAL='Server=mssql;...'"
+        echo "   AUTH_SERVICE_DBCONNECTION='Server=mssql;...'"
         echo ""
         echo "   ✅ CORRECT:"
-        echo "   AUTH_SERVICE_DBCONNECTION_LOCAL=Server=mssql;Database=AUTH_SERVICE_DB;User Id=sa;Password=StrongP@ssw0rd123!;TrustServerCertificate=true"
+        echo "   AUTH_SERVICE_DBCONNECTION=Server=mssql;Database=AUTH_SERVICE_DB;User Id=sa;Password=StrongP@ssw0rd123!;TrustServerCertificate=true"
         echo ""
         exit 1
     fi
