@@ -1,4 +1,4 @@
-name: CI - Build and Push Docker Images
+name: CI - Build and Push Docker Compose Images
 
 on:
   push:
@@ -13,51 +13,52 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      DOCKER_BUILDKIT: 1
       COMPOSE_FILE: docker-compose.yml
       IMAGE_TAG: latest
 
     steps:
+      # 🧩 STEP 1: Checkout code
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # 🧩 STEP 2: Set up Docker Buildx (for multi-platform builds)
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      # 🧩 STEP 3: Log in to DockerHub
       - name: Log in to DockerHub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # 🔹 Build and push AuthService
-      - name: Build and push AuthService image
+      # 🧩 STEP 4: Build all services with Docker Compose
+      - name: Build all images
         run: |
-          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/authservice:$IMAGE_TAG -f backend/src/AuthService/Dockerfile .
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/authservice:$IMAGE_TAG
+          echo "🔨 Building Docker images using docker-compose..."
+          docker compose -f $COMPOSE_FILE build --no-cache
 
-      # 🔹 Build and push UserService
-      - name: Build and push UserService image
+      # 🧩 STEP 5: Tag and push images to DockerHub
+      - name: Push Docker images to DockerHub
         run: |
-          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/userservice:$IMAGE_TAG -f backend/src/UserService/Dockerfile .
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/userservice:$IMAGE_TAG
+          echo "🚀 Pushing built images to DockerHub..."
+          docker images
 
-      # 🔹 Build and push LoggerService
-      - name: Build and push LoggerService image
-        run: |
-          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/loggerservice:$IMAGE_TAG -f backend/src/LoggerService/Dockerfile .
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/loggerservice:$IMAGE_TAG
+          # Define image names (same as docker-compose service names)
+          services=(authservice userservice loggerservice nginx-gateway)
 
-      # 🔹 Build and push Nginx (optional, if using custom config)
-      - name: Build and push Nginx image
-        run: |
-          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/nginx-gateway:$IMAGE_TAG -f nginx/Dockerfile .
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/nginx-gateway:$IMAGE_TAG
+          for service in "${services[@]}"; do
+            echo "Tagging and pushing $service..."
+            docker tag "$service" ${{ secrets.DOCKERHUB_USERNAME }}/$service:$IMAGE_TAG
+            docker push ${{ secrets.DOCKERHUB_USERNAME }}/$service:$IMAGE_TAG
+          done
 
-      - name: Verify pushed images
-        run: |
-          echo "✅ Successfully pushed images:"
-          echo "${{ secrets.DOCKERHUB_USERNAME }}/authservice:$IMAGE_TAG"
-          echo "${{ secrets.DOCKERHUB_USERNAME }}/userservice:$IMAGE_TAG"
-          echo "${{ secrets.DOCKERHUB_USERNAME }}/loggerservice:$IMAGE_TAG"
-          echo "${{ secrets.DOCKERHUB_USERNAME }}/nginx-gateway:$IMAGE_TAG"
+          echo "✅ All images pushed successfully."
+
+      # 🧩 STEP 6: Upload docker-compose.yml as artifact (optional)
+      - name: Upload docker-compose.yml
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-compose
+          path: docker-compose.yml
+          retention-days: 5
