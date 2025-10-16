@@ -16,7 +16,7 @@ services:
       start_period: 60s
     volumes:
       - mssql_data:/var/opt/mssql
-      - ./scripts/sql:/tmp/sql:ro  # Mount to a different directory
+      - ./scripts/sql:/tmp/sql:ro
     networks:
       - microservice_network
 
@@ -152,34 +152,6 @@ services:
       timeout: 5s
       retries: 10
       start_period: 45s
-    restart: unless-stopped
-    networks:
-      - microservice_network
-  
-  nginx:
-    build:
-      context: ./nginx
-      dockerfile: Dockerfile
-    container_name: nginx
-    ports:
-      - "80:80"
-      - "443:443"
-    depends_on:
-      authservice:
-        condition: service_healthy
-      userservice:
-        condition: service_healthy
-      loggerservice:
-        condition: service_healthy
-    volumes:
-      - ./nginx/certs:/etc/nginx/certs:ro
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-    healthcheck:
-      test: [ "CMD-SHELL", "curl -f http://localhost/health || exit 1" ]
-      interval: 15s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
     restart: unless-stopped
     networks:
       - microservice_network

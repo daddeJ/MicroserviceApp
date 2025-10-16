@@ -32,20 +32,20 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # 🧩 STEP 4: Build all services with Docker Compose
+      # 🧩 STEP 4: Build service images using Docker Compose
       - name: Build all images
         run: |
           echo "🔨 Building Docker images using docker-compose..."
           docker compose -f $COMPOSE_FILE build --no-cache
 
-      # 🧩 STEP 5: Tag and push images to DockerHub
+      # 🧩 STEP 5: Push built images to DockerHub
       - name: Push Docker images to DockerHub
         run: |
           echo "🚀 Pushing built images to DockerHub..."
           docker images
 
-          # Define image names (same as docker-compose service names)
-          services=(authservice userservice loggerservice nginx-gateway)
+          # Define image names (based on compose services)
+          services=(authservice userservice loggerservice)
 
           for service in "${services[@]}"; do
             echo "Tagging and pushing $service..."
