@@ -38,21 +38,24 @@ jobs:
           echo "🔨 Building Docker images using docker-compose..."
           docker compose -f $COMPOSE_FILE build --no-cache
 
-      # 🧩 STEP 5: Push built images to DockerHub
+      # 🧩 STEP 5: Tag and push images to DockerHub
       - name: Push Docker images to DockerHub
         run: |
           echo "🚀 Pushing built images to DockerHub..."
           docker images
-
-          # Define image names (based on compose services)
+      
+          # Match docker-compose naming pattern
           services=(authservice userservice loggerservice)
-
+      
           for service in "${services[@]}"; do
-            echo "Tagging and pushing $service..."
-            docker tag "$service" ${{ secrets.DOCKERHUB_USERNAME }}/$service:$IMAGE_TAG
-            docker push ${{ secrets.DOCKERHUB_USERNAME }}/$service:$IMAGE_TAG
+            local_image="microserviceapp-$service"
+            remote_image="${{ secrets.DOCKERHUB_USERNAME }}/$service:$IMAGE_TAG"
+      
+            echo "Tagging and pushing $local_image -> $remote_image"
+            docker tag "$local_image:latest" "$remote_image"
+            docker push "$remote_image"
           done
-
+      
           echo "✅ All images pushed successfully."
 
       # 🧩 STEP 6: Upload docker-compose.yml as artifact (optional)
